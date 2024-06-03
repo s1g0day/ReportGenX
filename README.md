@@ -12,8 +12,6 @@
 
 ## 配置
 
-`pip3 install requirements.txt`
-
 `config.yaml`
 
 ```
@@ -38,6 +36,75 @@ vulnerabilities:
   弱口令: '1.使用多种字符组合的强密码，如大小写字母+数字+特殊字符。
 
     2.用户密码中不要出现与用户名或者系统名相关的字符。'
+```
+
+# 启动
+
+该项目适用于 `python3.*` (虽然开发用的是3.11.4，但理论上任意`3.*`版本都行)
+
+1、安装模块
+
+```
+pip3 install -r requirements.txt
+```
+
+2、启动GUI
+
+```
+python3 ShitReport.py
+```
+
+3、偷个懒使用start.bat
+
+```
+@echo off
+rem 隐藏黑色窗口
+if "%1"=="h" goto begin 
+mshta vbscript:createobject("wscript.shell").run("%~nx0 h",0)(window.close)&&exit 
+:begin 
+
+REM 检查Python的安装路径
+set PYTHON=python
+set PYTHON3=python3
+
+REM 优先使用Python3
+if exist %PYTHON3% (
+    set PYTHON=%PYTHON3%
+)
+
+REM 使用Python运行demo.py
+%PYTHON% ShitReport.py
+
+REM 检查是否成功运行
+if %ERRORLEVEL% neq 0 (
+    echo Failed to run ShitReport.py
+    pause
+    exit /b 1
+)
+
+echo Successfully ran ShitReport.py
+pause
+exit /b 0
+
+```
+
+> 注: 如果使用start.bat的话，有两点需要注意:
+
+- 我们的电脑可能会安装python2和python3两个版本，需要注意默认`PYTHON=python`调用的版本，如果`2版本`的话就无法启动
+- 也要保证已经配置合适的环境变量
+
+```
+C:\Users\test>python2 -V
+Python 2.7.18
+
+C:\Users\test>python3 -V
+Python 3.11.4
+
+C:\Users\test>python -V
+Python 3.11.4
+
+C:\Users\test>path
+PATH=D:\0_tools\python\3;D:\0_tools\python\2;D:\0_tools\python\3\Scripts;D:\0_tools\python\2\Scripts;
 ```
 
 ## 基础测试
@@ -69,3 +136,20 @@ vulnerabilities:
 结果
 
 ![image-20240531160034417](images/README/image-20240531160034417.png)
+
+# 二开
+
+本项目只适用于当前模板，如果有需要可以对其再次二开，相应功能都已在代码中做注释。
+
+除常规功能外，引入了一些特殊的功能
+
+- 1、根据输入自动改变输出
+  - 根据隐患级别自动改变预警级别
+  
+  - 根据单位名称、网站名称自动改变隐患名称和问题描述默认值
+  
+  - 根据隐患类型自动改变隐患名称、问题描述及整改建议
+  
+- 2、根据隐患URL自动提取根域名
+
+- 3、针对漏洞复现添加单个或多个图文，相比前面几个，这个是最有意思且最复杂的。
