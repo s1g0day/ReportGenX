@@ -104,7 +104,7 @@ C:\Users\test>python -V
 Python 3.11.4
 
 C:\Users\test>path
-PATH=D:\0_tools\python\3;D:\0_tools\python\2;D:\0_tools\python\3\Scripts;D:\0_tools\python\2\Scripts;
+PATH=D:\python\3;D:\python\2;D:\python\3\Scripts;D:\python\2\Scripts;
 ```
 
 ## 基础测试
