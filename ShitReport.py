@@ -525,8 +525,8 @@ class ReportGenerator(QWidget):
             os.makedirs(customerCompanyName_dir)
 
         # 构建报告文件路径
-        # report_file_path = f'{customerCompanyName_dir}/{timestamp}_{replacements["#customerCompanyName#"]}存在{replacements["#vulName#"]}漏洞隐患【{replacements["#hazardLevel#"]}】.docx'
-        report_file_path_notime = f'{customerCompanyName_dir}/{replacements["#customerCompanyName#"]}存在{replacements["#vulName#"]}漏洞隐患【{replacements["#hazardLevel#"]}】.docx'      
+        # report_file_path = f'{customerCompanyName_dir}/{timestamp}_{replacements["#customerCompanyName#"]}{replacements["#websitename#"]}存在{replacements["#vulName#"]}漏洞隐患【{replacements["#hazardLevel#"]}】.docx'
+        report_file_path_notime = f'{customerCompanyName_dir}/{replacements["#customerCompanyName#"]}{replacements["#websitename#"]}存在{replacements["#vulName#"]}漏洞隐患【{replacements["#hazardLevel#"]}】.docx'      
         # 保存文档
         report_file_path = self.save_document(report_file_path_notime)
         # 显示一个消息框通知用户报告已生成
