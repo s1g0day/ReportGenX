@@ -441,7 +441,7 @@ class ReportGenerator(QWidget):
                             previous_content = content  # 更新上一个打印的内容
 
                             # 获取表格中的第12行第0列的单元格的段落
-                            paragraph = self.doc.tables[0].cell(12, 0).paragraphs[0]
+                            paragraph = self.doc.tables[0].cell(13, 0).paragraphs[0]
                             # 在段落中添加一个文本运行，用于显示漏洞文本
                             if vuln_text == '':
                                 paragraph.add_run(vuln_text)

@@ -10,7 +10,8 @@
 
 如果只关注报告而不关注格式，每个选项似乎都不错，各有千秋。遗憾的是，它们都无法完全匹配正在使用的模板。我曾考虑对其中一些项目进行二次开发，但对于我这个初学者来说，难度太大了。相比之下，Coderrrr-400师傅的项目对我来说比较简单直接，也更加可塑。虽然我不懂pyqt，但在chatgpt和Google的帮助下，二次开发的项目还是达到了预期效果。
 
-## 配置
+# 配置
+
 
 `config.yaml`
 
@@ -111,13 +112,13 @@ PATH=D:\python\3;D:\python\2;D:\python\3\Scripts;D:\python\2\Scripts;
 
 > 注: 图中所示为随便复制的测试数据，非实际漏洞
 
-![image-20240528165958848](images/README/image-20240528165958848.png)
+![image-20240604113439583](images/README/image-20240604113439583.png)
 
 ## 基础输出
 
 ### xxx.docx
 
-![image-20240528170019340](images/README/image-20240528170019340.png)
+![image-20240604113552644](images/README/image-20240604113552644.png)
 
 ### log.txt
 
@@ -131,11 +132,11 @@ PATH=D:\python\3;D:\python\2;D:\python\3\Scripts;D:\python\2\Scripts;
 
 ## 测试漏洞复现多图文
 
-![image-20240531155956894](images/README/image-20240531155956894.png)
+![image-20240604113703529](images/README/image-20240604113703529.png)
 
 结果
 
-![image-20240531160034417](images/README/image-20240531160034417.png)
+![image-20240604114042469](images/README/image-20240604114042469.png)
 
 # 二开
 
