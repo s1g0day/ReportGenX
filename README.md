@@ -16,28 +16,17 @@
 `config.yaml`
 
 ```
+report_Template: 'config/demo.docx'
+vulnerability_List: 'config/web漏洞合集描述和修复建议.xlsx'
 supplierName: '张三'
-city: '郑州'  # 自定义默认城市
-unitType:
-industry:
+city: '北京'
 ```
 
-漏洞名称及修复建议配置格式，换行的目的是为了在word中也能换行
+`web漏洞合集描述和修复建议.xlsx`
 
-```
-vulnerabilities:
-  弱口令: 
-    1.使用多种字符组合的强密码，如大小写字母+数字+特殊字符。
+- 必须包含漏洞名称、漏洞描述、修复建议这三个表头![image-20240604132138100](images/README/image-20240604132138100.png)
 
-    2.用户密码中不要出现与用户名或者系统名相关的字符。
-```
-或
-```
-vulnerabilities:
-  弱口令: '1.使用多种字符组合的强密码，如大小写字母+数字+特殊字符。
-
-    2.用户密码中不要出现与用户名或者系统名相关的字符。'
-```
+  除此之外的表头都无所谓
 
 # 启动
 

@@ -1,8 +1,8 @@
 '''
 Author     : S1g0day
-Version    : 0.6.1
+Version    : 0.7.0
 Creat time : 2024/5/24 09:29
-Modification time: 2024/6/1 9:00
+Modification time: 2024/6/4 13:00
 Introduce  : 便携式报告编写工具
 '''
 
@@ -12,6 +12,7 @@ import yaml
 import time
 import tempfile
 import tldextract
+import pandas as pd
 from docx import Document
 from datetime import datetime
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
@@ -36,10 +37,15 @@ class ReportGenerator(QWidget):
         # 从 YAML 文件中获取默认值
         self.push_config = yaml.safe_load(open("config/config.yaml", "r", encoding="utf-8").read())
 
+        # 读取Excel文件
+        self.vulnerability_names, self.vulnerabilities = self.read_vulnerabilities_from_excel(self.push_config["vulnerability_List"])
+
         self.labels = ["隐患编号:", "隐患名称:", "隐患URL:", "隐患类型:", "隐患级别:",
                        "预警级别:", "归属地市:", "单位类型:", "所属行业:", "单位名称:",
-                       "网站名称:", "网站域名:", "网站IP:", "工信备案号:", "发现时间:",
-                       "问题描述:", "整改建议:", "证据截图:", "工信域名备案截图:", "备注:"]
+                       "网站名称:", "网站域名:", "网站IP:", "备案号:", "发现时间:",
+                       "漏洞描述:", "修复建议:", "证据截图:", "工信域名备案截图:", "备注:"]
+        
+
         self.text_edits = [QLineEdit(self) for _ in range(14)]
         self.text_edits[10].setFixedHeight(60)  # 问题描述可能较长，增加文本框高度
         self.text_edits[11].setFixedHeight(60)  # 整改建议可能较长，增加文本框高度
@@ -50,7 +56,7 @@ class ReportGenerator(QWidget):
         self.vulnerability_id_text_edit.setText(self.generate_vulnerability_id())
         # 创建漏洞类型下拉框
         self.vulName_box = QComboBox(self)
-        self.vulName_box.addItems(list(self.push_config["vulnerabilities"].keys()))
+        self.vulName_box.addItems(self.vulnerability_names)
 
         # 设置下拉框样式
         self.vulName_box.setFixedSize(200, 20)
@@ -144,6 +150,38 @@ class ReportGenerator(QWidget):
         h_layout.addWidget(self.alert_level_text_edit)
         self.form_layout.addRow(QLabel(self.labels[3]), h_layout)
 
+        # 添加隐患URL到表单布局
+        self.form_layout.addRow(QLabel(self.labels[2]), self.text_edits[5])
+        self.text_edits[5].textChanged.connect(self.update_get_domain)
+       
+        # 创建一个水平布局用于放置域名信息
+        Website_Name_layout = QHBoxLayout()
+        # 添加网站名称到表单布局
+        Website_Name_layout.addWidget(self.text_edits[6])
+        # 添加网站IP到表单布局
+        Website_Name_layout.addWidget(QLabel(self.labels[12]))
+        Website_Name_layout.addWidget(self.text_edits[8])
+        self.form_layout.addRow(QLabel(self.labels[10]), Website_Name_layout)
+
+
+        # 创建一个水平布局用于放置域名信息
+        domain_layout = QHBoxLayout()
+        # 添加网站域名到表单布局
+        domain_layout.addWidget(self.text_edits[7])
+        # # 添加网站IP到表单布局
+        # domain_layout.addWidget(QLabel(self.labels[12]))
+        # domain_layout.addWidget(self.text_edits[8])
+        # 添加工信备案号到表单布局
+        domain_layout.addWidget(QLabel(self.labels[13]))
+        domain_layout.addWidget(self.text_edits[9])
+        self.form_layout.addRow(QLabel(self.labels[11]), domain_layout)
+
+        # 在init_ui方法中，为单位名称、网站名称和隐患类型的输入框或下拉框添加信号
+        self.text_edits[3].textChanged.connect(self.update_hazard_name)
+        self.text_edits[6].textChanged.connect(self.update_hazard_name)
+        self.vulName_box.currentIndexChanged.connect(self.update_hazard_name)
+        self.update_hazard_name()
+
         # 添加单位名称到表单布局
         self.form_layout.addRow(QLabel(self.labels[9]), self.text_edits[3])
 
@@ -160,32 +198,9 @@ class ReportGenerator(QWidget):
         unit_layout.addWidget(self.industry_box)
         self.form_layout.addRow(QLabel(self.labels[6]), unit_layout)
 
-        # 添加隐患URL到表单布局
-        self.form_layout.addRow(QLabel(self.labels[2]), self.text_edits[5])
-        self.text_edits[5].textChanged.connect(self.update_get_domain)
-        # 添加网站名称到表单布局
-        self.form_layout.addRow(QLabel(self.labels[10]), self.text_edits[6])
-
-        # 创建一个水平布局用于放置域名信息
-        domain_layout = QHBoxLayout()
-        # 添加网站域名到表单布局
-        domain_layout.addWidget(self.text_edits[7])
-        # 添加网站IP到表单布局
-        domain_layout.addWidget(QLabel(self.labels[12]))
-        domain_layout.addWidget(self.text_edits[8])
-        # 添加工信备案号到表单布局
-        domain_layout.addWidget(QLabel(self.labels[13]))
-        domain_layout.addWidget(self.text_edits[9])
-        # 添加网站名称到表单布局
-        self.form_layout.addRow(QLabel(self.labels[11]), domain_layout)
 
         # 添加隐患名称到表单布局
         self.form_layout.addRow(QLabel(self.labels[1]), self.text_edits[2])
-        # 在init_ui方法中，为单位名称、网站名称和隐患类型的输入框或下拉框添加信号
-        self.text_edits[3].textChanged.connect(self.update_hazard_name)
-        self.text_edits[6].textChanged.connect(self.update_hazard_name)
-        self.vulName_box.currentIndexChanged.connect(self.update_hazard_name)
-        self.update_hazard_name()
 
         # 添加发现时间到表单布局
         self.form_layout.addRow(QLabel(self.labels[14]), self.discovery_date_edit)
@@ -268,8 +283,10 @@ class ReportGenerator(QWidget):
         hazard_type = self.vulName_box.currentText()
         hazard_name = f"{unit_name}{website_name}存在{hazard_type}漏洞隐患"
         self.text_edits[2].setText(hazard_name)  # 设置隐患名称
-        self.text_edits[10].setText(hazard_name)  # 设置问题描述
-        self.text_edits[11].setText(self.push_config['vulnerabilities'].get(hazard_type))  # 设置整改建议
+
+        description, solution = self.get_vulnerability_info(hazard_type)
+        self.text_edits[10].setText(description if description else hazard_name)  # 设置问题描述
+        self.text_edits[11].setText(solution if solution else self.push_config['vulnerabilities'].get(hazard_type))  # 设置整改建议
 
     def update_alert_level(self):
         # 更新预警级别
@@ -413,7 +430,6 @@ class ReportGenerator(QWidget):
                 for cell_index, cell in enumerate(row.cells):
                     content = cell.text.strip()
                     if content != previous_content:
-                        # print(f"Row {row_index + 1}, Column {cell_index + 1}: {content}")
                         previous_content = content  # 更新上一个打印的内容
                         if key in content:
                             # 仅删除关键字
@@ -520,10 +536,45 @@ class ReportGenerator(QWidget):
         output_file_path = f'output/{replacements["#reportTime#"]}_output.txt'
         with open(output_file_path, 'a+') as f: f.write(output_file+'\n')
 
+    def read_vulnerabilities_from_excel(self, file_path):
+        """
+        从Excel文件中读取漏洞信息，并将其存储到字典中
+        """
+        data = pd.read_excel(file_path)
+        
+        vulnerability_names = []  # 存储漏洞名称的列表
+        vulnerabilities = {}  # 存储漏洞信息的字典
+        
+        for index, row in data.iterrows():
+            vulnerability_name = row['漏洞名称']
+            vulnerability_description = row['漏洞描述']
+            vulnerability_solution = row['加固建议']
+            
+            vulnerability_names.append(vulnerability_name)  # 将漏洞名称添加到列表中
+            
+            vulnerabilities[vulnerability_name.lower()] = {
+                '漏洞描述': vulnerability_description,
+                '加固建议': vulnerability_solution
+            }
+        
+        return vulnerability_names, vulnerabilities
+    
+    def get_vulnerability_info(self, name):
+        """
+        根据漏洞名称从字典中获取漏洞描述和加固建议
+        """
+        name = name.lower()
+        if name in self.vulnerabilities:
+            description = self.vulnerabilities[name]['漏洞描述']
+            solution = self.vulnerabilities[name]['加固建议']
+            return description, solution
+        else:
+            return None, None
+
     '''主函数'''
     def generate_report(self):
         # 加载模板文件
-        self.doc = Document('config/demo.docx')
+        self.doc = Document(self.push_config["report_Template"])
 
         # 创建一个字典，包含所有需要替换的字段
         replacements = {
