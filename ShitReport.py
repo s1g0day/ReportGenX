@@ -31,7 +31,7 @@ class ReportGenerator(QWidget):
         self.init_ui()  # 初始化UI界面
 
     def init_ui(self):
-        '''其他UI组件的初始化代码'''
+        '''设置 GUI 组件的初始化代码'''
 
         # 从 YAML 文件中获取默认值
         self.push_config = yaml.safe_load(open("config/config.yaml", "r", encoding="utf-8").read())
@@ -127,7 +127,7 @@ class ReportGenerator(QWidget):
         self.generate_button = QPushButton('生成报告', self)
         self.generate_button.clicked.connect(self.generate_report)
 
-        '''创建表单布局'''
+        '''设置 GUI 组件表单布局'''
         self.form_layout = QFormLayout()
         # 添加用于隐患编号的文本框到布局
         self.form_layout.addRow(QLabel(self.labels[0]), self.vulnerability_id_text_edit)
@@ -152,10 +152,10 @@ class ReportGenerator(QWidget):
         # 添加归属城市到表单布局
         self.text_edits[4].setText(self.push_config["city"])  # 设置默认值
         unit_layout.addWidget(self.text_edits[4])
-        # # 添加单位类型到表单布局
+        # 添加单位类型到表单布局
         unit_layout.addWidget(QLabel(self.labels[7]))
         unit_layout.addWidget(self.unitType_box)
-        # # 添加所属行业到表单布局
+        # 添加所属行业到表单布局
         unit_layout.addWidget(QLabel(self.labels[8]))
         unit_layout.addWidget(self.industry_box)
         self.form_layout.addRow(QLabel(self.labels[6]), unit_layout)
@@ -255,7 +255,6 @@ class ReportGenerator(QWidget):
         # 显示窗口
         self.show()
 
-
     def update_get_domain(self):
         '''提取隐患url的根域名'''
         url = self.text_edits[5].text()
@@ -315,7 +314,7 @@ class ReportGenerator(QWidget):
         # 保存漏洞复现描述和图片路径
         self.vuln_sections.append((new_vuln_layout, new_vuln_edit, new_vuln_image_label))
 
-
+    '''监控剪贴板'''
     def get_screenshot_from_clipboard(self):
         clipboard = QApplication.clipboard()
         mime_data = clipboard.mimeData()
@@ -328,6 +327,7 @@ class ReportGenerator(QWidget):
             QMessageBox.warning(self, '错误', '剪贴板中没有图片！')
             return None
 
+    '''处理漏洞复现截图'''
     def paste_new_vuln_image(self, image_label):
         screenshot = self.get_screenshot_from_clipboard()
         if screenshot:
@@ -347,6 +347,7 @@ class ReportGenerator(QWidget):
         self.form_layout.removeRow(layout)
         self.vuln_sections.remove((layout, edit, label))
 
+    '''处理备案截图'''
     def paste_image(self, image_type):
         """粘贴图像到 QLabel 并保存图像路径"""
         screenshot = self.get_screenshot_from_clipboard()
@@ -488,6 +489,7 @@ class ReportGenerator(QWidget):
             new_file_path = f'{report_file_path_notime[:-5]}-{count}.docx'
             self.doc.save(new_file_path)
             return new_file_path
+        
     def log_save(self, replacements):
 
         # 获取脚本所在目录
@@ -518,6 +520,7 @@ class ReportGenerator(QWidget):
         output_file_path = f'output/{replacements["#reportTime#"]}_output.txt'
         with open(output_file_path, 'a+') as f: f.write(output_file+'\n')
 
+    '''主函数'''
     def generate_report(self):
         # 加载模板文件
         self.doc = Document('config/demo.docx')
