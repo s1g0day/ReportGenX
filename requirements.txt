@@ -1,4 +1,7 @@
-PyQt6==6.7.0
-python_docx==1.1.2
-PyYAML==6.0.1
-tldextract==5.1.2
+PyQt5
+PyQt6
+python_docx
+PyYAML
+tldextract
+openpyxl
+pandas
