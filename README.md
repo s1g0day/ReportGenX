@@ -119,13 +119,24 @@ PATH=D:\python\3;D:\python\2;D:\python\3\Scripts;D:\python\2\Scripts;
 
 ![image-20240531164909031](images/README/image-20240531164909031.png)
 
-## 测试漏洞复现多图文
+## 漏洞复现多图文
 
 ![image-20240604113703529](images/README/image-20240604113703529.png)
 
 结果
 
 ![image-20240604114042469](images/README/image-20240604114042469.png)
+
+## 删除
+
+![image-20240605164514284](images/README/image-20240605164514284.png)
+
+```
+一键重置: 重置所有数据
+一键清除: 仅删除所有漏洞附件及描述
+```
+
+
 
 # 二开
 
