@@ -1,7 +1,7 @@
-PyQt5
-PyQt6
 python_docx
 PyYAML
 tldextract
 openpyxl
 pandas
+PyQt5
+PyQt6
