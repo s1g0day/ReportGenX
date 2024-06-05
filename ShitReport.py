@@ -1,8 +1,8 @@
 '''
 Author     : S1g0day
-Version    : 0.7.0
+Version    : 0.7.1
 Creat time : 2024/5/24 09:29
-Modification time: 2024/6/4 13:00
+Modification time: 2024/6/5 16:30
 Introduce  : 便携式报告编写工具
 '''
 
@@ -120,18 +120,24 @@ class ReportGenerator(QWidget):
         # 创建用于显示工信域名备案截图的标签和按钮
         self.image_label_asset = QLabel(self)
         self.paste_button_asset = QPushButton('点击读取截图', self)
-        self.paste_button_asset.clicked.connect(lambda: self.paste_image('asset'))
+        self.paste_button_asset.clicked.connect(self.paste_image)
         self.delete_button_asset = QPushButton('删除图片', self)
-        self.delete_button_asset.clicked.connect(lambda: self.delete_image('asset'))
+        self.delete_button_asset.clicked.connect(self.delete_image)
 
         # 保存所有的漏洞复现描述部分
         self.vuln_sections = []
         # 添加按钮用于在界面上添加新的漏洞复现描述和漏洞证明图片的功能
-        self.add_vuln_button = QPushButton('添加漏洞复现描述和图片', self)
+        self.add_vuln_button = QPushButton('添加证明', self)
         self.add_vuln_button.clicked.connect(self.add_vulnerability_section)
 
         self.generate_button = QPushButton('生成报告', self)
         self.generate_button.clicked.connect(self.generate_report)
+
+        self.reset_button = QPushButton('一键重置', self)
+        self.reset_button.clicked.connect(self.reset_all)
+
+        self.clear_all_button = QPushButton('一键清除', self)
+        self.clear_all_button.clicked.connect(self.clear_all_sections)
 
         '''设置 GUI 组件表单布局'''
         self.form_layout = QFormLayout()
@@ -198,7 +204,6 @@ class ReportGenerator(QWidget):
         unit_layout.addWidget(self.industry_box)
         self.form_layout.addRow(QLabel(self.labels[6]), unit_layout)
 
-
         # 添加隐患名称到表单布局
         self.form_layout.addRow(QLabel(self.labels[1]), self.text_edits[2])
 
@@ -216,10 +221,15 @@ class ReportGenerator(QWidget):
         # 创建按钮布局用于放置生成报告
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.generate_button)
+        button_layout.addWidget(self.reset_button)  # 一键重置
         self.form_layout.addRow(button_layout)
 
         # 添加新的漏洞复现描述和图片按钮
-        self.form_layout.addRow(self.add_vuln_button)
+        vuln_button_layout = QHBoxLayout()
+        vuln_button_layout.addWidget(self.add_vuln_button)
+        vuln_button_layout.addWidget(self.clear_all_button)
+        self.form_layout.addRow(vuln_button_layout)
+
 
         # 添加工信域名备案截图到表单布局
         asset_layout = QHBoxLayout()
@@ -269,6 +279,35 @@ class ReportGenerator(QWidget):
 
         # 显示窗口
         self.show()
+
+    def reset_all(self):
+        self.vulnerability_id_text_edit.setText(self.generate_vulnerability_id())
+        self.vulName_box.setCurrentIndex(0)
+        self.hazardLevel_box.setCurrentIndex(0)
+        self.alert_level_text_edit.clear()
+        self.unitType_box.setCurrentIndex(0)
+        self.industry_box.setCurrentIndex(0)
+        self.text_edits[2].clear()
+        self.text_edits[3].clear()
+        self.text_edits[4].clear()
+        self.text_edits[5].clear()
+        self.text_edits[6].clear()
+        self.text_edits[7].clear()
+        self.text_edits[8].clear()
+        self.text_edits[9].clear()
+        self.text_edits[10].clear()
+        self.text_edits[11].clear()
+        self.text_edits[12].setText(datetime.now().strftime('%Y.%m.%d'))
+        self.text_edits[13].clear()
+        self.delete_image()
+        self.clear_all_sections()
+
+    def clear_all_sections(self):
+        for section in self.vuln_sections:
+            layout, edit, image_label = section
+            self.form_layout.removeRow(layout)
+            
+        self.vuln_sections.clear()
 
     def update_get_domain(self):
         '''提取隐患url的根域名'''
@@ -369,19 +408,13 @@ class ReportGenerator(QWidget):
         """粘贴图像到 QLabel 并保存图像路径"""
         screenshot = self.get_screenshot_from_clipboard()
         if screenshot:
-            if image_type == 'asset':
-                self.asset_image = screenshot
-                self.image_label_asset.setPixmap(QPixmap.fromImage(screenshot).scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            self.asset_image = screenshot
+            self.image_label_asset.setPixmap(QPixmap.fromImage(screenshot).scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
 
     # 删除图片的函数
-    def delete_image(self, image_type):
+    def delete_image(self):
         """删除 QLabel 中的图像"""
-        if image_type == 'asset':
-            self.asset_image = None
-            self.image_label_asset.clear()
-        else:
-            self.vuln_image = None
-            self.image_label_vuln.clear()
+        self.image_label_asset.clear()
 
     def replace_text(self, replacements):
         # 替换段落中的占位符

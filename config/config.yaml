@@ -1,4 +1,4 @@
-version: 'V0.7'
+version: 'V0.7.1'
 report_Template: 'config/demo.docx'
 vulnerability_List: 'config/web漏洞合集描述和修复建议.xlsx'
 supplierName: '张三'
