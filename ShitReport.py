@@ -1,8 +1,8 @@
 '''
 Author     : S1g0day
-Version    : 0.7.1
+Version    : 0.8.1
 Creat time : 2024/5/24 09:29
-Modification time: 2024/6/5 16:30
+Modification time: 2024/7/5 17:00
 Introduce  : 便携式报告编写工具
 '''
 
@@ -39,6 +39,7 @@ class ReportGenerator(QWidget):
 
         # 读取Excel文件
         self.vulnerability_names, self.vulnerabilities = self.read_vulnerabilities_from_excel(self.push_config["vulnerability_List"])
+        self.Icp_domains, self.Icp_infos = self.read_Icp_from_excel(self.push_config["ICP_List"])
 
         self.labels = ["隐患编号:", "隐患名称:", "隐患URL:", "隐患类型:", "隐患级别:",
                        "预警级别:", "归属地市:", "单位类型:", "所属行业:", "单位名称:",
@@ -169,27 +170,26 @@ class ReportGenerator(QWidget):
         Website_Name_layout.addWidget(self.text_edits[8])
         self.form_layout.addRow(QLabel(self.labels[10]), Website_Name_layout)
 
-
         # 创建一个水平布局用于放置域名信息
         domain_layout = QHBoxLayout()
         # 添加网站域名到表单布局
         domain_layout.addWidget(self.text_edits[7])
-        # # 添加网站IP到表单布局
-        # domain_layout.addWidget(QLabel(self.labels[12]))
-        # domain_layout.addWidget(self.text_edits[8])
         # 添加工信备案号到表单布局
         domain_layout.addWidget(QLabel(self.labels[13]))
         domain_layout.addWidget(self.text_edits[9])
         self.form_layout.addRow(QLabel(self.labels[11]), domain_layout)
+        # 添加单位名称到表单布局
+        self.form_layout.addRow(QLabel(self.labels[9]), self.text_edits[3])
 
-        # 在init_ui方法中，为单位名称、网站名称和隐患类型的输入框或下拉框添加信号
+        # 在init_ui方法中，为网站域名添加信号，根据域名自动从文件中提取备案信息
+        self.text_edits[7].textChanged.connect(self.update_icp_info)
+        self.update_icp_info()
+
+        # 在init_ui方法中，为单位名称、网站名称和隐患类型添加信号，根据其中变化自动调整其他参数数据
         self.text_edits[3].textChanged.connect(self.update_hazard_name)
         self.text_edits[6].textChanged.connect(self.update_hazard_name)
         self.vulName_box.currentIndexChanged.connect(self.update_hazard_name)
         self.update_hazard_name()
-
-        # 添加单位名称到表单布局
-        self.form_layout.addRow(QLabel(self.labels[9]), self.text_edits[3])
 
         # 创建一个水平布局用于放置公司信息
         unit_layout = QHBoxLayout()
@@ -230,13 +230,15 @@ class ReportGenerator(QWidget):
         vuln_button_layout.addWidget(self.clear_all_button)
         self.form_layout.addRow(vuln_button_layout)
 
-
         # 添加工信域名备案截图到表单布局
         asset_layout = QHBoxLayout()
         asset_layout.addWidget(self.image_label_asset)
         asset_layout.addWidget(self.paste_button_asset)
         asset_layout.addWidget(self.delete_button_asset)
         self.form_layout.addRow(QLabel(self.labels[18]), asset_layout)
+
+        # 调用 add_vulnerability_section 方法
+        self.add_vulnerability_section()
 
         '''把表单布局添加到主布局中'''
         # 创建一个垂直布局，用于管理其他小部件和布局
@@ -315,6 +317,16 @@ class ReportGenerator(QWidget):
         domain = tldextract.extract(url).registered_domain
         self.text_edits[7].setText(domain)  # 设置网站域名
 
+    def update_icp_info(self):
+        '''
+        根据域名自动识别ICP备案信息
+        '''
+        domain = self.text_edits[7].text()
+        unit_name, service_licence = self.get_Icp_info(domain)
+
+        self.text_edits[3].setText(unit_name)
+        self.text_edits[9].setText(service_licence)
+
     # 添加一个槽函数用于更新隐患名称的值
     def update_hazard_name(self):
         unit_name = self.text_edits[3].text()
@@ -324,8 +336,8 @@ class ReportGenerator(QWidget):
         self.text_edits[2].setText(hazard_name)  # 设置隐患名称
 
         description, solution = self.get_vulnerability_info(hazard_type)
-        self.text_edits[10].setText(description if description else hazard_name)  # 设置问题描述
-        self.text_edits[11].setText(solution if solution else self.push_config['vulnerabilities'].get(hazard_type))  # 设置整改建议
+        self.text_edits[10].setText(hazard_name if (not description or description == "无") else description)  # 设置问题描述
+        self.text_edits[11].setText(solution)  # 设置整改建议
 
     def update_alert_level(self):
         # 更新预警级别
@@ -387,7 +399,7 @@ class ReportGenerator(QWidget):
     def paste_new_vuln_image(self, image_label):
         screenshot = self.get_screenshot_from_clipboard()
         if screenshot:
-            # 在 GUI 中显示缩放后的图片
+            # pyqt6: 在 GUI 中显示缩放后的图片
             image_label.setPixmap(QPixmap.fromImage(screenshot).scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             # 保存原始大小图片的引用
             image_label.original_pixmap = QPixmap.fromImage(screenshot)
@@ -409,6 +421,7 @@ class ReportGenerator(QWidget):
         screenshot = self.get_screenshot_from_clipboard()
         if screenshot:
             self.asset_image = screenshot
+            # pyqt6: 在 GUI 中显示缩放后的图片
             self.image_label_asset.setPixmap(QPixmap.fromImage(screenshot).scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
 
     # 删除图片的函数
@@ -576,7 +589,7 @@ class ReportGenerator(QWidget):
         data = pd.read_excel(file_path)
         
         vulnerability_names = []  # 存储漏洞名称的列表
-        vulnerabilities = {}  # 存储漏洞信息的字典
+        vulnerabilities = {}  # 存储漏洞描述和加固建议的字典
         
         for index, row in data.iterrows():
             vulnerability_name = row['漏洞名称']
@@ -601,6 +614,41 @@ class ReportGenerator(QWidget):
             description = self.vulnerabilities[name]['漏洞描述']
             solution = self.vulnerabilities[name]['加固建议']
             return description, solution
+        else:
+            return None, None
+
+    def read_Icp_from_excel(self, file_path):
+        """
+        从Excel文件中读取ICP信息，并将其存储到字典中
+        """
+        data = pd.read_excel(file_path)
+        
+        Icp_domains = []  # 存储根域名的列表
+        Icp_infos = {}  # 存储单位名称和备案号的字典
+        
+        for index, row in data.iterrows():
+            Icp_domain = row['domain']
+            Icp_serviceLicence = row['serviceLicence']
+            Icp_unitName = row['unitName']
+            
+            Icp_domains.append(Icp_domain)  # 将根域名添加到列表中
+            
+            Icp_infos[Icp_domain.lower()] = {
+                'serviceLicence': Icp_serviceLicence,
+                'unitName': Icp_unitName
+            }
+        
+        return Icp_domains, Icp_infos
+    
+    def get_Icp_info(self, domain):
+        """
+        根据根域名从字典中获取单位名称和备案号
+        """
+        name = domain.lower()
+        if name in self.Icp_infos:
+            unitName = self.Icp_infos[name]['unitName']
+            serviceLicence = self.Icp_infos[name]['serviceLicence']
+            return unitName, serviceLicence
         else:
             return None, None
 

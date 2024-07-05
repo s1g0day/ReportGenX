@@ -18,6 +18,7 @@
 ```
 report_Template: 'config/demo.docx'
 vulnerability_List: 'config/web漏洞合集描述和修复建议.xlsx'
+ICP_List: 'config/ICP备案信息.xlsx'
 supplierName: '张三'
 city: '北京'
 ```
@@ -28,9 +29,24 @@ city: '北京'
 
   除此之外的表头都无所谓
 
+`ICP备案信息.xlsx`
+
+- 必须包含unitName(单位名称)、domain(跟域名)、serviceLicence(备案号)
+
+  ![image-20240705170749367](images/README/image-20240705170749367.png)
+
+- 数据来源
+
+  ![image-20240705171031275](images/README/image-20240705171031275.png)
+
+  可以使用 [ICP_Query_Batch](https://github.com/s1g0day/ICP_Query_Batch) 进行自动提取
+
 # 启动
 
-该项目适用于 `python3.*` (虽然开发用的是3.11.4，但理论上任意`3.*`版本都行)
+该项目适用于 `python3.*` ，已验证:
+
+- 开发：3.11.4
+- 测试：3.8.6
 
 1、安装模块
 
