@@ -31,7 +31,7 @@ city: '北京'
 
 `ICP备案信息.xlsx`
 
-- 必须包含unitName(单位名称)、domain(跟域名)、serviceLicence(备案号)
+- 必须包含unitName(单位名称)、domain(根域名)、serviceLicence(备案号)
 
   ![image-20240705170749367](images/README/image-20240705170749367.png)
 
