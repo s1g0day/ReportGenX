@@ -3,5 +3,4 @@ PyYAML
 tldextract
 openpyxl
 pandas
-PyQt5
 PyQt6

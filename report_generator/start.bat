@@ -1,8 +1,4 @@
 @echo off
-rem 隐藏黑色窗口
-if "%1"=="h" goto begin 
-mshta vbscript:createobject("wscript.shell").run("%~nx0 h",0)(window.close)&&exit 
-:begin 
 REM 检查Python的安装路径
 set PYTHON=python
 set PYTHON3=python3

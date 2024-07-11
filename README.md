@@ -16,20 +16,22 @@
 `config.yaml`
 
 ```
-report_Template: 'config/demo.docx'
-vulnerability_List: 'config/web漏洞合集描述和修复建议.xlsx'
-ICP_List: 'config/ICP备案信息.xlsx'
+report_Template: 'templates/report_template.docx'
+vulnerability_List: 'data/vulnerabilities.xlsx'
+ICP_List: 'data/icp_info.xlsx'
 supplierName: '张三'
 city: '北京'
 ```
 
-`web漏洞合集描述和修复建议.xlsx`
+`vulnerabilities.xlsx`
 
-- 必须包含漏洞名称、漏洞描述、修复建议这三个表头![image-20240604132138100](images/README/image-20240604132138100.png)
+- 必须包含漏洞名称、漏洞描述、修复建议这三个表头
 
+  ![image-20240710101437914](./images/README/image-20240710101437914.png)
+  
   除此之外的表头都无所谓
 
-`ICP备案信息.xlsx`
+`icp_info.xlsx`
 
 - 必须包含unitName(单位名称)、domain(根域名)、serviceLicence(备案号)
 
@@ -117,13 +119,13 @@ PATH=D:\python\3;D:\python\2;D:\python\3\Scripts;D:\python\2\Scripts;
 
 > 注: 图中所示为随便复制的测试数据，非实际漏洞
 
-![image-20240604113439583](images/README/image-20240604113439583.png)
+![image-20240710100914098](./images/README/image-20240710100914098.png)
 
 ## 基础输出
 
 ### xxx.docx
 
-![image-20240604113552644](images/README/image-20240604113552644.png)
+![image-20240710101059490](./images/README/image-20240710101059490.png)
 
 ### log.txt
 

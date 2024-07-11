@@ -1,8 +1,8 @@
 '''
 Author     : S1g0day
-Version    : 0.8.1
+Version    : 0.8.3
 Creat time : 2024/5/24 09:29
-Modification time: 2024/7/5 17:00
+Modification time: 2024/7/10 11:00
 Introduce  : 便携式报告编写工具
 '''
 
@@ -27,29 +27,28 @@ class InsertionError(Exception):
 class ReportGenerator(QWidget):
     def __init__(self):
         super().__init__()
+        # 从 YAML 文件中获取默认值
+        self.push_config = yaml.safe_load(open("config/config.yaml", "r", encoding="utf-8").read())
+
         '''设置窗口图标等其他初始化'''
-        self.setWindowIcon(QIcon('config/th.jpg'))
         self.init_ui()  # 初始化UI界面
 
     def init_ui(self):
         '''设置 GUI 组件的初始化代码'''
 
-        # 从 YAML 文件中获取默认值
-        self.push_config = yaml.safe_load(open("config/config.yaml", "r", encoding="utf-8").read())
-
+        
         # 读取Excel文件
-        self.vulnerability_names, self.vulnerabilities = self.read_vulnerabilities_from_excel(self.push_config["vulnerability_List"])
-        self.Icp_domains, self.Icp_infos = self.read_Icp_from_excel(self.push_config["ICP_List"])
+        self.vulnerability_names, self.vulnerabilities = self.read_vulnerabilities_from_excel(self.push_config["vulnerabilities_file"])
+        self.Icp_domains, self.Icp_infos = self.read_Icp_from_excel(self.push_config["icp_info_file"])
 
         self.labels = ["隐患编号:", "隐患名称:", "隐患URL:", "隐患类型:", "隐患级别:",
                        "预警级别:", "归属地市:", "单位类型:", "所属行业:", "单位名称:",
                        "网站名称:", "网站域名:", "网站IP:", "备案号:", "发现时间:",
-                       "漏洞描述:", "修复建议:", "证据截图:", "工信域名备案截图:", "备注:"]
+                       "漏洞描述:", "漏洞危害:", "修复建议:", "证据截图:", "工信域名备案截图:", 
+                       "备注:"]
         
 
-        self.text_edits = [QLineEdit(self) for _ in range(14)]
-        self.text_edits[10].setFixedHeight(60)  # 问题描述可能较长，增加文本框高度
-        self.text_edits[11].setFixedHeight(60)  # 整改建议可能较长，增加文本框高度
+        self.text_edits = [QLineEdit(self) for _ in range(15)]
 
         # 创建文本框用于隐患编号
         self.vulnerability_id_text_edit = self.text_edits[0]
@@ -82,7 +81,7 @@ class ReportGenerator(QWidget):
 
         # 创建文本框用于预警级别
         self.alert_level_text_edit = self.text_edits[1]
-        self.alert_level_text_edit.setReadOnly(True)  # 只读
+        # self.alert_level_text_edit.setReadOnly(True)  # 只读
         # 当hazardLevel_box值改变时调用update_alert_level方法
         self.hazardLevel_box.currentIndexChanged.connect(self.update_alert_level)
         # 初始化预警级别
@@ -113,7 +112,7 @@ class ReportGenerator(QWidget):
             "QScrollBar:vertical {border: 2px solid grey;width: 20px;}")    # 下拉侧边栏宽高
 
         # 创建文本框用于发现时间
-        self.discovery_date_edit = self.text_edits[12]
+        self.discovery_date_edit = self.text_edits[13]
         # 设置文本框的初始文本为当前日期
         current_date = datetime.now().strftime('%Y.%m.%d')
         self.discovery_date_edit.setText(current_date)
@@ -210,13 +209,19 @@ class ReportGenerator(QWidget):
         # 添加发现时间到表单布局
         self.form_layout.addRow(QLabel(self.labels[14]), self.discovery_date_edit)
 
-        # 添加问题描述到表单布局
+        # 添加漏洞描述到表单布局
         self.form_layout.addRow(QLabel(self.labels[15]), self.text_edits[10])
-        # 添加整改建议到表单布局
+        self.text_edits[10].setFixedHeight(60)  # 漏洞描述可能较长，增加文本框高度
+        # 添加漏洞危害到表单布局
         self.form_layout.addRow(QLabel(self.labels[16]), self.text_edits[11])
+        self.text_edits[11].setFixedHeight(60)  # 漏洞危害可能较长，增加文本框高度
+        self.text_edits[11].textChanged.connect(self.update_hazard_name)
+        # 添加整改建议到表单布局
+        self.form_layout.addRow(QLabel(self.labels[17]), self.text_edits[12])
+        self.text_edits[12].setFixedHeight(60)  # 整改建议可能较长，增加文本框高度
 
         # 添加备注到表单布局
-        self.form_layout.addRow(QLabel(self.labels[-1]), self.text_edits[13])
+        self.form_layout.addRow(QLabel(self.labels[-1]), self.text_edits[14])
 
         # 创建按钮布局用于放置生成报告
         button_layout = QHBoxLayout()
@@ -235,7 +240,7 @@ class ReportGenerator(QWidget):
         asset_layout.addWidget(self.image_label_asset)
         asset_layout.addWidget(self.paste_button_asset)
         asset_layout.addWidget(self.delete_button_asset)
-        self.form_layout.addRow(QLabel(self.labels[18]), asset_layout)
+        self.form_layout.addRow(QLabel(self.labels[19]), asset_layout)
 
         # 调用 add_vulnerability_section 方法
         self.add_vulnerability_section()
@@ -286,12 +291,12 @@ class ReportGenerator(QWidget):
         self.vulnerability_id_text_edit.setText(self.generate_vulnerability_id())
         self.vulName_box.setCurrentIndex(0)
         self.hazardLevel_box.setCurrentIndex(0)
-        self.alert_level_text_edit.clear()
+        # self.alert_level_text_edit.clear()    # 等级不需要清除
         self.unitType_box.setCurrentIndex(0)
         self.industry_box.setCurrentIndex(0)
         self.text_edits[2].clear()
         self.text_edits[3].clear()
-        self.text_edits[4].clear()
+        # self.text_edits[4].clear()    # 城市不需要清除
         self.text_edits[5].clear()
         self.text_edits[6].clear()
         self.text_edits[7].clear()
@@ -299,8 +304,9 @@ class ReportGenerator(QWidget):
         self.text_edits[9].clear()
         self.text_edits[10].clear()
         self.text_edits[11].clear()
-        self.text_edits[12].setText(datetime.now().strftime('%Y.%m.%d'))
-        self.text_edits[13].clear()
+        self.text_edits[12].clear()
+        self.text_edits[13].setText(datetime.now().strftime('%Y.%m.%d'))
+        self.text_edits[14].clear()
         self.delete_image()
         self.clear_all_sections()
 
@@ -331,13 +337,28 @@ class ReportGenerator(QWidget):
     def update_hazard_name(self):
         unit_name = self.text_edits[3].text()
         website_name = self.text_edits[6].text()
+        Vulnerability_Hazard = self.text_edits[11].text()
         hazard_type = self.vulName_box.currentText()
         hazard_name = f"{unit_name}{website_name}存在{hazard_type}漏洞隐患"
         self.text_edits[2].setText(hazard_name)  # 设置隐患名称
 
         description, solution = self.get_vulnerability_info(hazard_type)
-        self.text_edits[10].setText(hazard_name if (not description or description == "无") else description)  # 设置问题描述
-        self.text_edits[11].setText(solution)  # 设置整改建议
+        # self.text_edits[10].setText(hazard_name if (not description or description == "无") else description)  
+        
+        # 设置漏洞描述
+        if not description or description == "无":
+            
+            if len(Vulnerability_Hazard) == 0:    # 设置漏洞危害
+                self.text_edits[10].setText(hazard_name)
+            else:
+                self.text_edits[10].setText(f"{hazard_name}{Vulnerability_Hazard}")
+        else:
+            if len(Vulnerability_Hazard) == 0:
+                self.text_edits[10].setText(description)
+            else:
+                self.text_edits[10].setText(f"{description}{Vulnerability_Hazard}")
+
+        self.text_edits[12].setText(solution)  # 设置整改建议
 
     def update_alert_level(self):
         # 更新预警级别
@@ -501,7 +522,6 @@ class ReportGenerator(QWidget):
                         content = cell.text.strip()
                         if content != previous_content:
                             previous_content = content  # 更新上一个打印的内容
-
                             # 获取表格中的第12行第0列的单元格的段落
                             paragraph = self.doc.tables[0].cell(13, 0).paragraphs[0]
                             # 在段落中添加一个文本运行，用于显示漏洞文本
@@ -655,7 +675,7 @@ class ReportGenerator(QWidget):
     '''主函数'''
     def generate_report(self):
         # 加载模板文件
-        self.doc = Document(self.push_config["report_Template"])
+        self.doc = Document(self.push_config["template_path"])
 
         # 创建一个字典，包含所有需要替换的字段
         replacements = {
@@ -675,8 +695,8 @@ class ReportGenerator(QWidget):
             '#caseNumber#': self.text_edits[9].text(),
             '#reportTime#': self.discovery_date_edit.text(),
             '#problemDescription#': self.text_edits[10].text(),
-            '#vul_modify_repair#': self.text_edits[11].text(),
-            '#remark#': self.text_edits[13].text(),
+            '#vul_modify_repair#': self.text_edits[12].text(),
+            '#remark#': self.text_edits[14].text(),
         }
         self.replace_text(replacements)
 
