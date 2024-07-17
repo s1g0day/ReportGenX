@@ -1,4 +1,4 @@
-version: 'V0.8.3'
+version: 'V0.8.4'
 icon_path: 'config/th.jpg'
 template_path: 'templates/report_template.docx'
 vulnerabilities_file: 'data/vulnerabilities.xlsx'
