@@ -1,8 +1,8 @@
 '''
 Author     : S1g0day
-Version    : 0.8.3
+Version    : 0.8.4
 Creat time : 2024/5/24 09:29
-Modification time: 2024/7/10 11:00
+Modification time: 2024/7/17 16:30
 Introduce  : 便携式报告编写工具
 '''
 
@@ -319,7 +319,7 @@ class ReportGenerator(QWidget):
 
     def update_get_domain(self):
         '''提取隐患url的根域名'''
-        url = self.text_edits[5].text()
+        url = self.text_edits[5].text().strip()
         domain = tldextract.extract(url).registered_domain
         self.text_edits[7].setText(domain)  # 设置网站域名
 
@@ -327,7 +327,7 @@ class ReportGenerator(QWidget):
         '''
         根据域名自动识别ICP备案信息
         '''
-        domain = self.text_edits[7].text()
+        domain = self.text_edits[7].text().strip()
         unit_name, service_licence = self.get_Icp_info(domain)
 
         self.text_edits[3].setText(unit_name)
@@ -335,9 +335,9 @@ class ReportGenerator(QWidget):
 
     # 添加一个槽函数用于更新隐患名称的值
     def update_hazard_name(self):
-        unit_name = self.text_edits[3].text()
-        website_name = self.text_edits[6].text()
-        Vulnerability_Hazard = self.text_edits[11].text()
+        unit_name = self.text_edits[3].text().strip()
+        website_name = self.text_edits[6].text().strip()
+        Vulnerability_Hazard = self.text_edits[11].text().strip()
         hazard_type = self.vulName_box.currentText()
         hazard_name = f"{unit_name}{website_name}存在{hazard_type}漏洞隐患"
         self.text_edits[2].setText(hazard_name)  # 设置隐患名称
@@ -550,7 +550,7 @@ class ReportGenerator(QWidget):
             if hasattr(label, 'original_pixmap'):  # 检查是否有原始图片的引用
                 # 使用原始图片的路径
                 vuln_path = self.save_image_temporarily(label.original_pixmap.toImage())
-                self.vuln_sections_text_with_image(edit.text(), vuln_path)
+                self.vuln_sections_text_with_image(edit.text().strip(), vuln_path)
 
     def save_image_temporarily(self, image):
         temp_file = tempfile.mkstemp(suffix='.png')[1]
@@ -600,7 +600,7 @@ class ReportGenerator(QWidget):
 
         output_file = f'{replacements["#customerCompanyName#"]}\t{replacements["#target#"]}\t{replacements["#vulName#"]}\t{self.push_config["supplierName"]}\t{replacements["#reportTime#"]}'
         output_file_path = f'output/{replacements["#reportTime#"]}_output.txt'
-        with open(output_file_path, 'a+') as f: f.write(output_file+'\n')
+        with open(output_file_path, 'a+') as f: f.write('\n'+output_file)
 
     def read_vulnerabilities_from_excel(self, file_path):
         """
@@ -679,24 +679,24 @@ class ReportGenerator(QWidget):
 
         # 创建一个字典，包含所有需要替换的字段
         replacements = {
-            '#reportId#': self.text_edits[0].text(),
-            '#reportName#': self.text_edits[2].text(),
-            '#target#': self.text_edits[5].text(),
+            '#reportId#': self.text_edits[0].text().strip(),
+            '#reportName#': self.text_edits[2].text().strip(),
+            '#target#': self.text_edits[5].text().strip(),
             '#vulName#': self.vulName_box.currentText(),
             '#hazardLevel#': self.hazardLevel_box.currentText(),
-            '#warningLevel#': self.alert_level_text_edit.text(),
-            '#city#': self.text_edits[4].text(),
+            '#warningLevel#': self.alert_level_text_edit.text().strip(),
+            '#city#': self.text_edits[4].text().strip(),
             '#unitType#': self.unitType_box.currentText(),
             '#industry#': self.industry_box.currentText(),
-            '#customerCompanyName#': self.text_edits[3].text(),
-            '#websitename#': self.text_edits[6].text(),
-            '#domain#': self.text_edits[7].text(),
-            '#ipaddress#': self.text_edits[8].text(),
-            '#caseNumber#': self.text_edits[9].text(),
-            '#reportTime#': self.discovery_date_edit.text(),
-            '#problemDescription#': self.text_edits[10].text(),
-            '#vul_modify_repair#': self.text_edits[12].text(),
-            '#remark#': self.text_edits[14].text(),
+            '#customerCompanyName#': self.text_edits[3].text().strip(),
+            '#websitename#': self.text_edits[6].text().strip(),
+            '#domain#': self.text_edits[7].text().strip(),
+            '#ipaddress#': self.text_edits[8].text().strip(),
+            '#caseNumber#': self.text_edits[9].text().strip(),
+            '#reportTime#': self.discovery_date_edit.text().strip(),
+            '#problemDescription#': self.text_edits[10].text().strip(),
+            '#vul_modify_repair#': self.text_edits[12].text().strip(),
+            '#remark#': self.text_edits[14].text().strip(),
         }
         self.replace_text(replacements)
 
