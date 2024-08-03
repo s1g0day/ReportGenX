@@ -29,18 +29,16 @@ class ReportGenerator(QWidget):
         super().__init__()
         # 从 YAML 文件中获取默认值
         self.push_config = yaml.safe_load(open("config/config.yaml", "r", encoding="utf-8").read())
-
-        '''设置窗口图标等其他初始化'''
-        self.init_ui()  # 初始化UI界面
-
-    def init_ui(self):
-        '''设置 GUI 组件的初始化代码'''
-
-        
         # 读取Excel文件
         self.vulnerability_names, self.vulnerabilities = self.read_vulnerabilities_from_excel(self.push_config["vulnerabilities_file"])
         self.Icp_domains, self.Icp_infos = self.read_Icp_from_excel(self.push_config["icp_info_file"])
 
+        '''设置窗口图标等其他初始化'''
+        self.setWindowIcon(QIcon('config/th.jpg'))
+        self.init_ui()  # 初始化UI界面
+
+    def init_ui(self):
+        '''设置 GUI 组件的初始化代码'''
         self.labels = ["隐患编号:", "隐患名称:", "隐患URL:", "隐患类型:", "隐患级别:",
                        "预警级别:", "归属地市:", "单位类型:", "所属行业:", "单位名称:",
                        "网站名称:", "网站域名:", "网站IP:", "备案号:", "发现时间:",
