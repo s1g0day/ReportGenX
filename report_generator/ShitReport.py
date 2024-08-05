@@ -2,7 +2,7 @@
 Author     : S1g0day
 Version    : 0.8.4
 Creat time : 2024/5/24 09:29
-Modification time: 2024/7/17 16:30
+Modification time: 2024/8/5 16:47
 Introduce  : 便携式报告编写工具
 '''
 
@@ -11,6 +11,7 @@ import sys
 import yaml
 import time
 import tempfile
+import warnings
 import tldextract
 import pandas as pd
 from docx import Document
@@ -19,6 +20,7 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QListView, QWidget, QLabel, QLineEdit, QComboBox, QPushButton, QVBoxLayout, QHBoxLayout, QFormLayout, QMessageBox, QScrollArea
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # 自定义异常，用于中断嵌套循环
 class InsertionError(Exception):
@@ -27,8 +29,12 @@ class InsertionError(Exception):
 class ReportGenerator(QWidget):
     def __init__(self):
         super().__init__()
+        
+        '''读取文件'''
         # 从 YAML 文件中获取默认值
         self.push_config = yaml.safe_load(open("config/config.yaml", "r", encoding="utf-8").read())
+        # 加载模板文件
+        self.doc = Document(self.push_config["template_path"])
         # 读取Excel文件
         self.vulnerability_names, self.vulnerabilities = self.read_vulnerabilities_from_excel(self.push_config["vulnerabilities_file"])
         self.Icp_domains, self.Icp_infos = self.read_Icp_from_excel(self.push_config["icp_info_file"])
@@ -448,7 +454,7 @@ class ReportGenerator(QWidget):
         """删除 QLabel 中的图像"""
         self.image_label_asset.clear()
 
-    def replace_text(self, replacements):
+    def replace_report_text(self, replacements):
         # 替换段落中的占位符
         for paragraph in self.doc.paragraphs:
             runs = paragraph.runs
@@ -640,7 +646,6 @@ class ReportGenerator(QWidget):
         从Excel文件中读取ICP信息，并将其存储到字典中
         """
         data = pd.read_excel(file_path)
-        
         Icp_domains = []  # 存储根域名的列表
         Icp_infos = {}  # 存储单位名称和备案号的字典
         
@@ -672,8 +677,6 @@ class ReportGenerator(QWidget):
 
     '''主函数'''
     def generate_report(self):
-        # 加载模板文件
-        self.doc = Document(self.push_config["template_path"])
 
         # 创建一个字典，包含所有需要替换的字段
         replacements = {
@@ -696,7 +699,7 @@ class ReportGenerator(QWidget):
             '#vul_modify_repair#': self.text_edits[12].text().strip(),
             '#remark#': self.text_edits[14].text().strip(),
         }
-        self.replace_text(replacements)
+        self.replace_report_text(replacements)
 
         # 添加工信域名备案截图
         if hasattr(self, 'asset_image') and self.asset_image:
