@@ -33,8 +33,7 @@ class ReportGenerator(QWidget):
         '''读取文件'''
         # 从 YAML 文件中获取默认值
         self.push_config = yaml.safe_load(open("config/config.yaml", "r", encoding="utf-8").read())
-        # 加载模板文件
-        self.doc = Document(self.push_config["template_path"])
+
         # 读取Excel文件
         self.vulnerability_names, self.vulnerabilities = self.read_vulnerabilities_from_excel(self.push_config["vulnerabilities_file"])
         self.Icp_domains, self.Icp_infos = self.read_Icp_from_excel(self.push_config["icp_info_file"])
@@ -677,7 +676,9 @@ class ReportGenerator(QWidget):
 
     '''主函数'''
     def generate_report(self):
-
+        # 加载模板文件
+        self.doc = Document(self.push_config["template_path"])
+        
         # 创建一个字典，包含所有需要替换的字段
         replacements = {
             '#reportId#': self.text_edits[0].text().strip(),
