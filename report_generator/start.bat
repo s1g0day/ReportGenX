@@ -9,7 +9,7 @@ if exist %PYTHON3% (
 )
 
 REM 使用Python运行demo.py
-%PYTHON% ShitReport.py
+%PYTHON% ReportGenX.py
 
 REM 检查是否成功运行
 if %ERRORLEVEL% neq 0 (
