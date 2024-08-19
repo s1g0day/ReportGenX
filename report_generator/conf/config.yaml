@@ -1,8 +1,10 @@
-version: 'V0.8.4'
-icon_path: 'config/th.jpg'
-template_path: 'templates/report_template.docx'
+version: 'V0.9.1'
+icon_path: 'resources/icon/favicon.ico'
+template_path: 'resources/templates/report_template.docx'
 vulnerabilities_file: 'data/vulnerabilities.xlsx'
 icp_info_file: 'data/icp_info.xlsx'
+agreed_dates_log_file: 'output/logs/agreed_dates.txt'
+output_filepath: 'output/report/'
 supplierName: '张三'
 city: '北京'
 unitType:
