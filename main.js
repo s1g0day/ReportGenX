@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, shell, dialog, Menu } = require('electron')
 const path = require('path')
 const http = require('http')
 const crypto = require('crypto')
-const { spawn } = require('child_process')
+const { spawn, execSync } = require('child_process')
 const { loadSharedConfig, encodeBootstrapArgs } = require('./shared-config-utils')
 const log = require('electron-log')
 
@@ -368,22 +368,13 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   isQuitting = true
   if (pythonProcess) {
-    // Windows: 使用 taskkill 杀死进程树（包括所有子进程）
-    // Unix: 尝试杀死进程组
     if (process.platform === 'win32') {
-      const killer = spawn('taskkill', ['/pid', String(pythonProcess.pid), '/T', '/F'], { stdio: 'ignore' })
-      const killTimeout = setTimeout(() => {
-        log.warn(`taskkill timed out after 3s for PID ${pythonProcess.pid}, abandoning`)
-        killer.kill('SIGKILL')
-      }, 3000)
-      killer.on('close', (code) => {
-        clearTimeout(killTimeout)
-        if (code === 0) {
-          log.info(`Backend process tree killed (PID ${pythonProcess.pid})`)
-        } else {
-          log.warn(`taskkill exited with code ${code} for PID ${pythonProcess.pid}`)
-        }
-      })
+      try {
+        execSync(`taskkill /pid ${pythonProcess.pid} /T /F`, { stdio: 'ignore', timeout: 3000 })
+        log.info(`Backend process tree killed (PID ${pythonProcess.pid})`)
+      } catch (_e) {
+        log.warn(`taskkill failed for PID ${pythonProcess.pid}, process may have already exited`)
+      }
     } else {
       try {
         process.kill(-pythonProcess.pid, 'SIGKILL')

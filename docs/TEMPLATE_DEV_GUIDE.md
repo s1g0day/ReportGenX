@@ -1,7 +1,7 @@
 # 模板开发完整指南
 
 > ReportGenX 模板系统开发文档
-> 版本: 2.0.0 | 更新日期: 2026-05-30 | 适用版本: 0.20.1
+> 版本: 2.0.0 | 更新日期: 2026-05-30 | 适用版本: 0.20.2
 
 ---
 
@@ -124,7 +124,7 @@ POST /api/templates/{id}/generate
 
 ## 2. PLUGIN 描述符规范
 
-### 标准模式（当前所有 5 个模板均使用）
+### 标准模式（当前所有 6 个模板均使用）
 
 每个模板在 `handler.py` 中导出模块级 `PLUGIN` 字典：
 
@@ -191,7 +191,7 @@ def execute(data, output_dir, template_manager, config, template_id="my_template
     return {"success": success, "report_path": path, "message": msg, "errors": [] if success else errors}
 ```
 
-> ⚠️ **不再使用** `BaseTemplateHandler` 类继承 + `HandlerRegistry.register()`。当前 5 个模板全部基于 PLUGIN descriptor 模式。与 `BaseTemplateHandler` 类名保留仅作为旧模板兼容。
+> ⚠️ **不再使用** `BaseTemplateHandler` 类继承 + `HandlerRegistry.register()`。当前 6 个模板全部基于 PLUGIN descriptor 模式。与 `BaseTemplateHandler` 类名保留仅作为旧模板兼容。
 
 ---
 
@@ -604,7 +604,7 @@ from core import (
 
 ### Q: PLUGIN descriptor 和旧 BaseTemplateHandler 的区别？
 
-`BaseTemplateHandler` 是旧的类继承模式，已不再推荐。当前所有 5 个模板使用 PLUGIN descriptor + `execute()` 函数模式：
+`BaseTemplateHandler` 是旧的类继承模式，已不再推荐。当前所有 6 个模板使用 PLUGIN descriptor + `execute()` 函数模式：
 - 不再继承任何类
 - 通过 `GenerationContext(ctx)` 获取框架服务
 - `PLUGIN` 字典告诉 `PluginRuntime` 如何调用模板
@@ -620,5 +620,6 @@ from core import (
 | `penetration_test` | 渗透测试报告 | ~30+ | 高 | `backend/templates/penetration_test/` |
 | `Attack_Defense` | 攻防演练报告 | ~40+ | 高 | `backend/templates/Attack_Defense/` |
 | `single_vuln_report` | 单个漏洞报告 | ~10 | 低 | `backend/templates/single_vuln_report/` |
+| `intranet_vuln` | 内网渗透测试报告 | ~40+ | 高 | `backend/templates/intranet_vuln/` |
 
 推荐从 `single_vuln_report` 开始阅读 — 代码最简洁、模式最清晰。

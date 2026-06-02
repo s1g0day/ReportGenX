@@ -2,7 +2,7 @@
 
 > 面向接手开发者的快速上下文文档
 > 更新时间：2026-05-30
-> 当前版本：0.20.1
+> 当前版本：0.20.2
 
 ## 1. 项目定位
 
@@ -37,7 +37,7 @@
 - 核心逻辑：`backend/core/*`
 - SDK 门面：`core/__init__.py`（从 backend.core.* 重导出）
 - 插件运行时：`backend/plugin_host/runtime.py`
-- 模板目录：`backend/templates/*`（5 个模板）
+- 模板目录：`backend/templates/*`（6 个模板）
 - 数据库：`backend/data/combined.db`（SQLite）
 
 ---
@@ -141,7 +141,7 @@ def generate(data, ctx):  # ctx = GenerationContext — 提供所有框架服务
     return True, ctx.save(filename), "OK"
 ```
 
-### 当前模板（5 个）
+### 当前模板（6 个）
 
 | 模板 ID | 名称 | 说明 |
 |---------|------|------|
@@ -150,6 +150,7 @@ def generate(data, ctx):  # ctx = GenerationContext — 提供所有框架服务
 | `penetration_test` | 渗透测试报告 | 完整渗透测试报告，含漏洞表/风险图/目录 |
 | `Attack_Defense` | 攻防演练报告 | 攻防演练，含服务器类型/DB 连接/数据统计 |
 | `single_vuln_report` | 单个漏洞报告 | 最简模板，从漏洞库快速选取填充 |
+| `intranet_vuln` | 内网渗透测试报告 | 内网漏洞渗透测试报告，含渗透入口、互联网/内网渗透路径、数据汇总 |
 
 ---
 

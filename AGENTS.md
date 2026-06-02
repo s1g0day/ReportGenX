@@ -52,7 +52,6 @@ npm run sync-version    # Syncs version from package.json to backend/shared-conf
 │   │   ├── document_editor.py # Word document editor
 │   │   ├── document_image_processor.py # Image processor
 │   │   ├── exceptions.py   # Custom exceptions
-│   │   ├── handler_config.py # Handler configuration
 │   │   ├── handler_utils.py # Handler utilities
 │   │   ├── logger.py       # Logging system
 │   │   ├── report_merger.py # Report merger
@@ -63,7 +62,7 @@ npm run sync-version    # Syncs version from package.json to backend/shared-conf
 │   │       ├── schema.yaml # Form definition
 │   │       ├── handler.py  # Business logic
 │   │       └── template.docx
-│   │   # Current templates: vuln_report, intrusion_report, penetration_test, Attack_Defense
+│   │   # Current templates: vuln_report, intrusion_report, penetration_test, Attack_Defense, single_vuln_report, intranet_vuln
 │   └── data/               # SQLite database
 ├── src/                    # Frontend source
 │   ├── index.html
@@ -167,32 +166,37 @@ window.AppMyModule = {
 
 1. Create folder: `backend/templates/{template_id}/`
 2. Add `schema.yaml` - defines form fields and output config
-3. Add `handler.py` - extends `BaseTemplateHandler`
+3. Add `handler.py` - exports PLUGIN descriptor with `execute()` function
 4. Add `template.docx` - Word template with `#placeholder#` markers
 
 ### Handler Pattern
 
-```python
-from core.base_handler import BaseTemplateHandler, register_handler
+Current standard: **PLUGIN descriptor + GenerationContext** (no class inheritance).
 
-@register_handler("my_template")
-class MyTemplateHandler(BaseTemplateHandler):
-    def preprocess(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        # Set defaults, generate IDs, format dates
-        processed = data.copy()
-        self._set_default_dates(processed, ['report_date'])
-        return processed
-    
-    def generate(self, data: Dict[str, Any], output_dir: str) -> Tuple[bool, str, str]:
-        # Load template, replace placeholders, save
-        self.output_dir = output_dir
-        doc = self.load_document()
-        replacements = self.build_replacements(data)
-        self.replace_text_in_document(doc, replacements)
-        output_path = self.generate_output_path(data, output_dir)
-        final_path = self.save_document(doc, output_path)
-        return True, final_path, "Report generated"
+```python
+from backend.core.generation_context import GenerationContext
+
+PLUGIN = {"id": "my_template", "execute": None}
+
+def execute(data, output_dir, template_manager, config, template_id):
+    template_dir = template_manager.get_template_dir(template_id)
+    info = template_manager.get_template_info(template_id)
+    ctx = GenerationContext(template_dir, info, config, output_dir)
+
+    doc = ctx.load_document()
+    ctx.replace_text({
+        "#title#": data.get("title", ""),
+        "#content#": data.get("content", ""),
+    })
+    path = ctx.save_document(doc, ctx.build_output_path(
+        data.get("unit_name", "unknown"), "report.docx"))
+    ctx.postprocess(path, data, log_prefix="my_template")
+    return {"success": True, "report_path": path, "message": "OK", "errors": []}
+
+PLUGIN["execute"] = execute
 ```
+
+> See `backend/templates/single_vuln_report/handler.py` (simplest) or `backend/templates/intranet_vuln/handler.py` (full-featured) for complete examples.
 
 ## API Conventions
 

@@ -1,7 +1,7 @@
 # 部署与运维指南
 
 > 更新日期：2026-05-30
-> 适用版本：0.20.1
+> 适用版本：0.20.2
 
 ## 1. 部署模式
 
@@ -217,4 +217,3 @@ curl http://127.0.0.1:8000/api/backup-db -H "X-App-Token: <TOKEN>" -o backup.db
 - [RUNTIME_OPERATIONS_RUNBOOK.md](./RUNTIME_OPERATIONS_RUNBOOK.md) — Runtime 配置与故障排查
 - [ARCHITECTURE_LAYER_FLOW_ANALYSIS.md](./ARCHITECTURE_LAYER_FLOW_ANALYSIS.md) — 架构分层分析
 - [TEMPLATE_DEV_GUIDE.md](./TEMPLATE_DEV_GUIDE.md) — 模板开发完整指南
-- [TEMPLATE_QUICK_START.md](./TEMPLATE_QUICK_START.md) — 模板开发快速入门

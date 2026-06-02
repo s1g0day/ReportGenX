@@ -911,7 +911,7 @@ def _process_url_value(url_text: str) -> dict[str, Any]:
                 parsed = urlparse(text)
                 netloc = parsed.netloc
                 host = netloc.split(':')[0] if ':' in netloc else netloc
-                result["domain"] = netloc
+                result["domain"] = host
                 if re.match(ip_pattern, host):
                     result["ip"] = host
             except (ValueError, AttributeError):
