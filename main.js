@@ -253,40 +253,9 @@ function buildMenu() {
           click: () => {
             if (mainWindow) {
               mainWindow.webContents.executeJavaScript(`
-                (async function () {
-                  try {
-                    var result = await AppAPI._request('/api/check-update')
-                    if (result && result.has_update) {
-                      var banner = document.getElementById('update-banner')
-                      if (banner) {
-                        banner.textContent = ''
-                        banner.appendChild(document.createTextNode('新版本 '))
-                        var strong = document.createElement('strong')
-                        strong.textContent = result.latest_version
-                        banner.appendChild(strong)
-                        banner.appendChild(document.createTextNode(' 可用 (当前 ' + result.current_version + ') — '))
-                        var link = document.createElement('a')
-                        link.href = '#'
-                        link.id = 'update-download-link'
-                        link.textContent = '查看详情'
-                        link.addEventListener('click', function (e) {
-                          e.preventDefault()
-                          if (window.electronAPI && window.electronAPI.openExternal) {
-                            window.electronAPI.openExternal(result.download_url)
-                          } else {
-                            window.open(result.download_url, '_blank')
-                          }
-                        })
-                        banner.appendChild(link)
-                        banner.style.display = 'block'
-                      }
-                    } else {
-                      if (window.AppUtils) AppUtils.showToast('当前已是最新版本', 'info')
-                    }
-                  } catch (e) {
-                    if (window.AppUtils) AppUtils.showToast('检查更新失败', 'error')
-                  }
-                })()
+                if (window._triggerUpdateCheck) {
+                  window._triggerUpdateCheck(true)
+                }
               `)
             }
           }

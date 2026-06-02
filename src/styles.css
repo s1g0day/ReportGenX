@@ -2295,3 +2295,81 @@ textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
     font-size: 13px;
     line-height: 1.4;
 }
+
+/* ========== Version Update Indicator & Toast ========== */
+
+/* Version number when update is available */
+.version-update-available {
+    color: #1890ff;
+    white-space: nowrap;
+    animation: pulse-version 2s ease-in-out infinite;
+}
+
+@keyframes pulse-version {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.version-update-available:hover {
+    color: #40a9ff;
+}
+
+/* Version update toast notification */
+.update-toast {
+    position: fixed;
+    top: 20px;
+    right: -360px;
+    z-index: 1200;
+    background: #e6f7ff;
+    border: 1px solid #91d5ff;
+    border-left: 4px solid #1890ff;
+    border-radius: 8px;
+    padding: 14px 18px;
+    min-width: 300px;
+    max-width: 400px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    font-size: 14px;
+    line-height: 1.5;
+    color: #333;
+    transition: right 0.4s ease-out;
+}
+.update-toast.show {
+    right: 20px;
+}
+.update-toast .toast-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.update-toast .toast-msg {
+    flex: 1;
+}
+.update-toast .toast-msg strong {
+    color: #1890ff;
+}
+.update-toast .toast-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.update-toast .toast-link {
+    color: #1890ff;
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.update-toast .toast-link:hover {
+    color: #40a9ff;
+}
+.update-toast .toast-close {
+    cursor: pointer;
+    color: #999;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 4px;
+}
+.update-toast .toast-close:hover {
+    color: #666;
+}

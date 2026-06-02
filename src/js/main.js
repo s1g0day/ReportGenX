@@ -31,28 +31,102 @@ window.addEventListener('DOMContentLoaded', async () => {
         versionWarningBanner.style.display = 'none';
     }
 
+    // 存储最新更新检查结果，供菜单"检查更新"和点击回调使用
+    window._latestUpdateResult = null;
+    window._updateToastShown = false;
+
+    /**
+     * 显示更新提示 Toast
+     */
+    function showUpdateToast(latestVersion, downloadUrl) {
+        if (window._updateToastShown) return;
+        window._updateToastShown = true;
+
+        var toast = document.createElement('div');
+        toast.className = 'update-toast';
+        toast.innerHTML = '<div class="toast-body">' +
+            '<span class="toast-msg">发现新版本 <strong>V' + latestVersion + '</strong></span>' +
+            '<span class="toast-actions">' +
+            '<a class="toast-link">查看详情</a>' +
+            '<span class="toast-close">&times;</span>' +
+            '</span></div>';
+        document.body.appendChild(toast);
+
+        // 动画滑入
+        setTimeout(function () { toast.classList.add('show'); }, 10);
+
+        // 查看详情
+        toast.querySelector('.toast-link').onclick = function (e) {
+            e.preventDefault();
+            if (window.electronAPI && window.electronAPI.openExternal) {
+                window.electronAPI.openExternal(downloadUrl);
+            } else if (downloadUrl) {
+                window.open(downloadUrl, '_blank');
+            }
+        };
+
+        // 关闭按钮
+        toast.querySelector('.toast-close').onclick = function () {
+            toast.classList.remove('show');
+            setTimeout(function () { if (toast.parentNode) toast.remove(); }, 400);
+        };
+
+        // 8 秒后自动消失
+        setTimeout(function () {
+            toast.classList.remove('show');
+            setTimeout(function () { if (toast.parentNode) toast.remove(); }, 400);
+        }, 8000);
+    }
+
+    /**
+     * 检查更新：发现新版本时在版本号上显示蓝色箭头指示器
+     */
     async function checkForUpdates() {
         try {
             const result = await AppAPI._request('/api/check-update');
+            window._latestUpdateResult = result;
+            const verEl = document.getElementById('version-info');
+            if (!verEl) return;
+
             if (result.has_update) {
-                const banner = document.getElementById('update-banner');
-                if (banner) {
-                    banner.innerHTML = `新版本 <strong>${result.latest_version}</strong> 可用 (当前 ${result.current_version}) — <a href="#" id="update-download-link">查看详情</a>`;
-                    banner.style.display = 'block';
-                    document.getElementById('update-download-link').addEventListener('click', (e) => {
-                        e.preventDefault();
-                        if (window.electronAPI && window.electronAPI.openExternal) {
-                            window.electronAPI.openExternal(result.download_url);
-                        } else {
-                            window.open(result.download_url, '_blank');
-                        }
-                    });
-                }
+                verEl.classList.add('version-update-available');
+                showUpdateToast(result.latest_version, result.download_url);
+            } else {
+                verEl.classList.remove('version-update-available');
+                verEl.title = '';
+                verEl.onclick = null;
             }
         } catch (e) {
             // Silently ignore - update check is non-critical
         }
     }
+
+    /**
+     * 供菜单"检查更新"调用的全局入口
+     * @param {boolean} showToastOnNoUpdate - 无更新时是否显示 toast
+     */
+    window._triggerUpdateCheck = async function (showToastOnNoUpdate) {
+        try {
+            const result = await AppAPI._request('/api/check-update');
+            window._latestUpdateResult = result;
+            const verEl = document.getElementById('version-info');
+            if (!verEl) return;
+
+            if (result && result.has_update) {
+                verEl.classList.add('version-update-available');
+                showUpdateToast(result.latest_version, result.download_url);
+            } else if (showToastOnNoUpdate && result && !result.error) {
+                verEl.classList.remove('version-update-available');
+                verEl.title = '';
+                verEl.onclick = null;
+                if (window.AppUtils) AppUtils.showToast('当前已是最新版本', 'info');
+            }
+        } catch (e) {
+            if (showToastOnNoUpdate && window.AppUtils) {
+                AppUtils.showToast('检查更新失败', 'error');
+            }
+        }
+    };
 
     async function checkVersionConsistency(configVersion) {
         try {

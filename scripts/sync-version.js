@@ -2,6 +2,7 @@
  * 版本同步脚本
  * - package.json -> backend/config.yaml (version: Vx.y.z)
  * - package.json -> backend/shared-config.json (app.version: x.y.z)
+ * - package.json -> README.md (当前归档版本：`x.y.z`)
  */
 
 const fs = require('fs');
@@ -11,6 +12,7 @@ const ROOT_DIR = path.join(__dirname, '..');
 const PACKAGE_JSON = path.join(ROOT_DIR, 'package.json');
 const CONFIG_YAML = path.join(ROOT_DIR, 'backend', 'config.yaml');
 const SHARED_CONFIG_JSON = path.join(ROOT_DIR, 'backend', 'shared-config.json');
+const README_MD = path.join(ROOT_DIR, 'README.md');
 
 const DEFAULT_SHARED_CONFIG = {
   server: {
@@ -112,6 +114,26 @@ function syncSharedConfig(version) {
   fs.writeFileSync(SHARED_CONFIG_JSON, `${JSON.stringify(next, null, 2)}\n`, 'utf-8');
 }
 
+function syncReadme(version) {
+  let readmeContent = fs.readFileSync(README_MD, 'utf-8');
+
+  const versionRegex = /当前归档版本：`[\d.]+`/;
+  const newVersion = `当前归档版本：\`${version}\``;
+
+  const currentMatch = readmeContent.match(versionRegex);
+  if (!currentMatch) {
+    throw new Error('version line not found in README.md');
+  }
+
+  // Skip write if version already matches
+  if (currentMatch[0] === newVersion) {
+    return;
+  }
+
+  readmeContent = readmeContent.replace(versionRegex, newVersion);
+  fs.writeFileSync(README_MD, readmeContent, 'utf-8');
+}
+
 function syncVersion() {
   const packageJson = readJson(PACKAGE_JSON);
   if (!packageJson.version) {
@@ -121,6 +143,7 @@ function syncVersion() {
   const version = packageJson.version;
   syncConfigYaml(version);
   syncSharedConfig(version);
+  syncReadme(version);
 
   console.log(`✓ Version synced: ${version}`);
 }
