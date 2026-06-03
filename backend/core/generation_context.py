@@ -620,8 +620,13 @@ class GenerationContext:
         if self._db_reader is None:
             db_path_config = self.config.get("vul_or_icp", "data/combined.db")
             if not os.path.isabs(db_path_config):
-                # template_dir = backend/templates/{id}/, go up 2 to backend/
-                backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(self.template_dir)))
+                # 优先使用 AppData 目录（生产环境由 Electron 通过环境变量传入）
+                userdata_dir = os.getenv('REPORTGENX_USERDATA_DIR')
+                if userdata_dir:
+                    backend_dir = userdata_dir
+                else:
+                    # template_dir = backend/templates/{id}/, go up 2 to backend/
+                    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(self.template_dir)))
                 db_path = os.path.join(backend_dir, db_path_config)
             else:
                 db_path = db_path_config

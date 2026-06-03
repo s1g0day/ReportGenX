@@ -111,8 +111,92 @@ else:
 
 BASE_DIR = base_dir
 
-CONF_PATH = os.path.join(BASE_DIR, "config.yaml")
-SHARED_CONF_PATH = os.path.join(BASE_DIR, "shared-config.json")
+# ========== User Data Directory Resolution ==========
+# Production (frozen): Electron 通过 --userdata-dir 传入 OS 用户数据目录
+#   --> 所有可变数据写入 AppData，安装目录保持只读
+# Development (not frozen): 直接使用 backend/ 目录，行为不变
+# Fallback: AppData 不可用时回退到 BASE_DIR（只读，不 crash）
+
+def _parse_userdata_dir_arg() -> Optional[str]:
+    """从 sys.argv 解析 --userdata-dir= 参数。"""
+    for arg in sys.argv:
+        if arg.startswith('--userdata-dir='):
+            val = arg.split('=', 1)[1].strip()
+            if val:
+                return val
+    return None
+
+_USERDATA_DIR_ARG = _parse_userdata_dir_arg()
+_IS_FROZEN = getattr(sys, 'frozen', False)
+
+# 仅在生产模式下启用 AppData
+_USERDATA_ENABLED = bool(_IS_FROZEN and _USERDATA_DIR_ARG)
+USER_DATA_DIR: Optional[str] = _USERDATA_DIR_ARG if _USERDATA_ENABLED else None
+
+def _ensure_dir(path: str) -> None:
+    """确保目录存在（幂等）。"""
+    os.makedirs(path, exist_ok=True)
+
+def _init_userdata_dir() -> bool:
+    """
+    初始化 AppData 目录结构并执行首次启动迁移。
+    
+    Returns:
+        True 表示 AppData 初始化成功，False 表示回退到 BASE_DIR。
+    """
+    if not USER_DATA_DIR:
+        return False
+    
+    try:
+        # 创建目录结构
+        _ensure_dir(os.path.join(USER_DATA_DIR, 'data'))
+        _ensure_dir(os.path.join(USER_DATA_DIR, 'output', 'report'))
+        _ensure_dir(os.path.join(USER_DATA_DIR, 'output', 'temp'))
+        _ensure_dir(os.path.join(USER_DATA_DIR, 'output', 'logs'))
+        _ensure_dir(os.path.join(USER_DATA_DIR, 'templates'))
+        
+        # 首次启动迁移：若 AppData 下无 config.yaml，从安装目录复制种子数据
+        appdata_config = os.path.join(USER_DATA_DIR, 'config.yaml')
+        if not os.path.exists(appdata_config):
+            logger.info("First launch detected — migrating seed data to AppData...")
+            seeds = [
+                ('config.yaml', 'config.yaml'),
+                (os.path.join('data', 'combined.db'), os.path.join('data', 'combined.db')),
+                ('shared-config.json', 'shared-config.json'),
+            ]
+            for src_rel, dst_rel in seeds:
+                src_path = os.path.join(BASE_DIR, src_rel)
+                dst_path = os.path.join(USER_DATA_DIR, dst_rel)
+                if not os.path.exists(dst_path) and os.path.exists(src_path):
+                    _ensure_dir(os.path.dirname(dst_path))
+                    shutil.copy2(src_path, dst_path)
+                    logger.info(f"  Copied {src_rel} -> AppData")
+                elif not os.path.exists(src_path):
+                    logger.warning(f"  Seed file not found, skipped: {src_path}")
+            logger.info("First-launch migration complete.")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Failed to initialize AppData directory: {e}")
+        logger.warning("Falling back to install directory (read-only mode).")
+        return False
+
+# 执行 AppData 初始化；失败时关闭 AppData 模式
+if _USERDATA_ENABLED:
+    if not _init_userdata_dir():
+        _USERDATA_ENABLED = False
+        USER_DATA_DIR = None
+
+# 可变数据根目录：生产环境 = AppData，开发环境 = backend/
+DATA_ROOT = USER_DATA_DIR if _USERDATA_ENABLED else BASE_DIR
+
+logger.info(f"DATA_ROOT: {DATA_ROOT} (frozen={_IS_FROZEN}, appdata={_USERDATA_ENABLED})")
+
+# ========== Path Definitions ==========
+# 注意：内置模板仍在安装目录（只读），其他可变数据使用 DATA_ROOT
+
+CONF_PATH = os.path.join(DATA_ROOT, "config.yaml")
+SHARED_CONF_PATH = os.path.join(DATA_ROOT, "shared-config.json")
 
 def load_config():
     if not os.path.exists(CONF_PATH):
@@ -276,9 +360,14 @@ _cached_vulnerabilities = None
 _cached_icp_infos = None
 _template_manager = None
 
-TEMPLATES_BASE_DIR = os.path.join(BASE_DIR, "templates")
+TEMPLATES_BASE_DIR = os.path.join(BASE_DIR, "templates")  # 内置模板（安装目录，只读）
 TEMPLATES_DIR = TEMPLATES_BASE_DIR  # 模板根目录
 TEMPLATES_DELETED_DIR = os.path.join(TEMPLATES_BASE_DIR, "_deleted")  # 已删除模板备份目录（隐藏）
+
+# 用户自定义模板目录（AppData，可读写）
+USER_TEMPLATES_DIR: Optional[str] = (
+    os.path.join(USER_DATA_DIR, "templates") if _USERDATA_ENABLED else None
+)
 
 
 def get_db_reader():
@@ -286,7 +375,7 @@ def get_db_reader():
     global _db_reader
     if _db_reader is None:
         _db_reader = DbDataReader(
-            db_path=os.path.join(BASE_DIR, config["vul_or_icp"])
+            db_path=os.path.join(DATA_ROOT, config["vul_or_icp"])
         )
     return _db_reader
 
@@ -367,7 +456,10 @@ def get_template_manager():
     """
     global _template_manager
     if _template_manager is None:
-        _template_manager = TemplateManager(TEMPLATES_DIR, config)
+        _template_manager = TemplateManager(
+            TEMPLATES_DIR, config,
+            user_templates_dir=USER_TEMPLATES_DIR
+        )
         _assert_template_handler_alignment(_template_manager)
         
         # 动态挂载模板路由
@@ -672,12 +764,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OUTPUT_DIR = os.path.join(BASE_DIR, "output", "report")
+OUTPUT_DIR = os.path.join(DATA_ROOT, "output", "report")
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 app.mount("/reports", StaticFiles(directory=OUTPUT_DIR), name="reports")
 
-TEMP_DIR = os.path.join(BASE_DIR, "output", "temp")
+TEMP_DIR = os.path.join(DATA_ROOT, "output", "temp")
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 app.mount("/temp", StaticFiles(directory=TEMP_DIR), name="temp")
@@ -707,10 +799,11 @@ def _build_open_folder_allowlist() -> list[str]:
     if not isinstance(configured, list):
         configured = defaults
     resolved: list[str] = []
+    # 相对路径基于 DATA_ROOT 解析（生产环境 = AppData，开发环境 = backend/）
     for relative_path in configured:
         if not isinstance(relative_path, str):
             continue
-        resolved.append(os.path.realpath(os.path.join(BASE_DIR, relative_path)))
+        resolved.append(os.path.realpath(os.path.join(DATA_ROOT, relative_path)))
 
     if not resolved:
         resolved = [os.path.realpath(OUTPUT_DIR)]
@@ -850,7 +943,7 @@ def update_plugin_runtime_config(req: PluginRuntimeConfigRequest):
 @config_router.get("/api/backup-db")
 def backup_database():
     """下载数据库备份"""
-    db_path = os.path.join(BASE_DIR, config["vul_or_icp"])
+    db_path = os.path.join(DATA_ROOT, config["vul_or_icp"])
     if os.path.exists(db_path):
         filename = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
         return FileResponse(path=db_path, filename=filename, media_type='application/x-sqlite3')
@@ -1910,20 +2003,34 @@ def _detect_templates_in_zip(names: list[str]) -> list[str]:
 def _import_single_template(zf, template_id: str, all_names: list[str], overwrite: bool) -> dict[str, Any]:
     """
     从 ZIP 中导入单个模板 (Security Hardened)
+    
+    导入目标目录：
+    - 生产模式（AppData 启用）：导入到 USER_TEMPLATES_DIR，跨重装持久保留
+    - 开发模式 / AppData 未启用：导入到 TEMPLATES_DIR
     """
+    # 确定导入目标目录
+    import_base_dir = USER_TEMPLATES_DIR if _USERDATA_ENABLED and USER_TEMPLATES_DIR else TEMPLATES_DIR
+
     # 过滤出属于该模板的文件
     template_files = [n for n in all_names if n.startswith(f"{template_id}/")]
-    
+
     if not template_files:
         return {"success": False, "reason": "No files found"}
-    
+
     # 检查必需文件
     schema_found = any(n == f"{template_id}/schema.yaml" for n in template_files)
     if not schema_found:
         return {"success": False, "reason": "schema.yaml not found"}
-    
-    # 检查是否已存在
-    target_dir = os.path.join(TEMPLATES_DIR, template_id)
+
+    # 检查是否已存在（同时检查内置目录和用户目录）
+    target_dir = os.path.join(import_base_dir, template_id)
+    builtin_dir = os.path.join(TEMPLATES_DIR, template_id)
+    for check_dir in [target_dir, builtin_dir]:
+        if check_dir == target_dir:
+            continue
+        if os.path.exists(check_dir):
+            return {"success": False, "reason": f"Template '{template_id}' already exists as built-in template"}
+
     backup_dir: Optional[str] = None
     if os.path.exists(target_dir):
         if not overwrite:
@@ -1931,7 +2038,7 @@ def _import_single_template(zf, template_id: str, all_names: list[str], overwrit
         # 备份现有模板
         backup_dir = f"{target_dir}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         shutil.move(target_dir, backup_dir)
-    
+
     # [Security Fix] Zip Slip 防御 & 安全解压
     extracted_files = []
     try:
@@ -1939,27 +2046,22 @@ def _import_single_template(zf, template_id: str, all_names: list[str], overwrit
             # 1. 检查文件名是否包含路径遍历字符
             if '..' in file_name or file_name.startswith('/') or '\\' in file_name:
                 raise ValueError(f"Malicious path detected: {file_name}")
-            
+
             # 2. 规范化目标路径
-            target_path = os.path.join(TEMPLATES_DIR, file_name)
-            if not os.path.abspath(target_path).startswith(os.path.abspath(TEMPLATES_DIR)):
+            target_path = os.path.join(import_base_dir, file_name)
+            if not os.path.abspath(target_path).startswith(os.path.abspath(import_base_dir)):
                 raise ValueError(f"Path traversal attempt: {file_name}")
 
             # 3. 解压
-            zf.extract(file_name, TEMPLATES_DIR)
+            zf.extract(file_name, import_base_dir)
             extracted_files.append(target_path)
-            
+
             # 4. [Security Fix] 如果是 .py 文件，立即进行静态审计
-            # 如果解压了恶意代码，虽然还未加载，但留在磁盘上是隐患。
-            # 这里我们利用 TemplateManager 的审计功能进行 Pre-validation
             if file_name.endswith('.py'):
                 try:
-                    # 临时实例化一个 TemplateManager 来借用其审计方法，或者直接调用静态方法
-                    # 这里直接调用实例的方法（因为 startup 时已初始化单例）
                     tm = get_template_manager()
                     tm.audit_code_security(template_id, target_path)
                 except Exception as audit_err:
-                    # 审计失败，回滚操作（删除已解压的文件）
                     logger.error(f"Audit failed during import for {file_name}: {audit_err}")
                     raise ValueError(f"Security Policy Violation: {str(audit_err)}")
 
@@ -2114,19 +2216,34 @@ async def batch_import_templates(files: list[UploadFile] = File(...), overwrite:
 
 @app.delete("/api/templates/{template_id}")
 def delete_template(template_id: str, backup: bool = True):
-    """删除模板"""
-    # 保护默认模板不被删除 —— 由各模板 runtime.yaml 中的 protected 字段驱动
+    """删除模板（支持内置模板备份删除和用户模板彻底删除）"""
+    tm = get_template_manager()
+
+    # 保护检查：扫描内置目录和用户目录的 runtime.yaml
     protected_templates = []
-    for tid in get_template_manager().template_ids:
-        runtime_path = os.path.join(TEMPLATES_DIR, tid, "runtime.yaml")
-        if os.path.exists(runtime_path):
-            with open(runtime_path, 'r', encoding='utf-8') as f:
-                runtime_config = yaml.safe_load(f) or {}
-                if runtime_config.get('protected'):
-                    protected_templates.append(tid)
+    dirs_to_check = [TEMPLATES_DIR]
+    if USER_TEMPLATES_DIR and os.path.isdir(USER_TEMPLATES_DIR):
+        dirs_to_check.append(USER_TEMPLATES_DIR)
+    for tid in tm.template_ids:
+        for base_dir in dirs_to_check:
+            runtime_path = os.path.join(base_dir, tid, "runtime.yaml")
+            if os.path.exists(runtime_path):
+                with open(runtime_path, 'r', encoding='utf-8') as f:
+                    runtime_config = yaml.safe_load(f) or {}
+                    if runtime_config.get('protected'):
+                        protected_templates.append(tid)
+                break  # found runtime.yaml, no need to check other dirs
     if template_id in protected_templates:
         raise HTTPException(status_code=403, detail=f"Cannot delete protected template: {template_id}")
-    
+
+    # 优先使用 TemplateManager.delete_template（支持用户模板）
+    if template_id in tm.user_template_ids:
+        success, msg = tm.delete_template(template_id)
+        if success:
+            return {"success": True, "message": msg}
+        raise HTTPException(status_code=500, detail=msg)
+
+    # 内置模板：沿用旧逻辑（备份到 _deleted 目录）
     template_dir = os.path.join(TEMPLATES_DIR, template_id)
     if not os.path.exists(template_dir):
         raise HTTPException(status_code=404, detail=f"Template not found: {template_id}")
@@ -2145,7 +2262,7 @@ def delete_template(template_id: str, backup: bool = True):
             shutil.rmtree(template_dir)
         
         # 重新加载模板
-        get_template_manager().reload_templates()
+        tm.reload_templates()
         
         return {
             "success": True,

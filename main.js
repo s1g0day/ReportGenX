@@ -79,6 +79,10 @@ function startPythonBackend() {
       backendExecutable = path.join(distPath, 'api')
     }
     args = [] // Executable handles main entry point
+
+    // 传递 userData 目录给 Python 后端，使可变数据写入 AppData
+    const userDataPath = app.getPath('userData')
+    args.push('--userdata-dir=' + userDataPath)
   } else {
     // Development Mode
     log.info(`Starting Python backend in dev mode: ${cwd}`)
@@ -90,7 +94,8 @@ function startPythonBackend() {
       ...process.env,
       PYTHONIOENCODING: 'utf-8',
       PYTHONUTF8: '1',
-      APP_API_TOKEN
+      APP_API_TOKEN,
+      REPORTGENX_USERDATA_DIR: app.isPackaged ? app.getPath('userData') : ''
     }
   })
 

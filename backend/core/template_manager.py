@@ -76,44 +76,66 @@ class TemplateManager:
     # 排除的目录：以 _ 或 . 开头的目录，以及特定系统目录
     EXCLUDED_DIRS = {'_deleted', '_backup', '__pycache__', '.git', '.vscode', '.idea'}
     
-    def __init__(self, templates_dir: str, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, templates_dir: str, config: Optional[Dict[str, Any]] = None,
+                 user_templates_dir: Optional[str] = None):
         """
         初始化模板管理器
         
         Args:
-            templates_dir: 模板根目录路径
+            templates_dir: 内置模板根目录路径（安装目录，只读）
             config: 全局配置 (用于解析数据源)
+            user_templates_dir: 用户自定义模板目录（AppData，可读写），可选
         """
         self.templates_dir = templates_dir
+        self.user_templates_dir = user_templates_dir
         self.config = config if config is not None else {}
         self._templates: Dict[str, TemplateInfo] = {}
         self._template_versions: Dict[str, List[str]] = {}  # {template_id: [versions]}
         self._template_routers: Dict[str, Any] = {}  # 新增：存储模板路由
+        self._template_source_dirs: Dict[str, str] = {}  # {template_id: source_directory}
         self._load_all_templates()
     
     def _load_all_templates(self):
-        """扫描并加载所有模板"""
-        if not os.path.exists(self.templates_dir):
-            logger.warning(f"Templates directory not found: {self.templates_dir}")
+        """扫描并加载所有模板（内置 + 用户自定义）"""
+        self._scan_templates_dir(self.templates_dir, is_user=False)
+
+        if self.user_templates_dir and os.path.isdir(self.user_templates_dir):
+            logger.info(f"Scanning user templates directory: {self.user_templates_dir}")
+            self._scan_templates_dir(self.user_templates_dir, is_user=True)
+    
+    def _scan_templates_dir(self, templates_base: str, is_user: bool = False):
+        """扫描指定目录下的模板"""
+        if not os.path.exists(templates_base):
+            if not is_user:
+                logger.warning(f"Templates directory not found: {templates_base}")
             return
         
-        for item in os.listdir(self.templates_dir):
+        for item in os.listdir(templates_base):
             # 跳过排除目录和隐藏目录（以 _ 或 . 开头）
             if item in self.EXCLUDED_DIRS or item.startswith(('_', '.')):
                 logger.debug(f"Skipping excluded directory: {item}")
                 continue
             
             # 安全检查：防止路径遍历（解决问题 12）
-            if not validate_path_safety(item, self.templates_dir):
+            if not validate_path_safety(item, templates_base):
                 logger.warning(f"Skipping unsafe path: {item}")
                 continue
             
-            template_path = os.path.join(self.templates_dir, item)
+            template_path = os.path.join(templates_base, item)
             if not os.path.isdir(template_path):
+                continue
+            
+            # 与已加载的内置模板冲突时：用户模板跳过并警告
+            if is_user and item in self._templates:
+                logger.warning(
+                    f"User template '{item}' conflicts with built-in template — "
+                    f"user template skipped. Rename the user template folder to use it."
+                )
                 continue
             
             schema_path = os.path.join(template_path, "schema.yaml")
             if os.path.exists(schema_path):
+                self._template_source_dirs[item] = template_path
                 self._load_template(item, schema_path)
     
     def _load_template(self, template_id: str, schema_path: str):
@@ -478,13 +500,19 @@ class TemplateManager:
             "summary_configs": template.summary_configs
         }
     
+    def _get_template_source_dir(self, template_id: str) -> Optional[str]:
+        """获取模板的实际源目录（内置或用户目录）。"""
+        return self._template_source_dirs.get(template_id, self.templates_dir)
+    
     def get_template_file_path(self, template_id: str) -> Optional[str]:
         """获取模板 docx 文件的完整路径"""
         template = self._templates.get(template_id)
         if not template:
             return None
         
-        template_dir = os.path.join(self.templates_dir, template_id)
+        template_dir = self._get_template_source_dir(template_id)
+        if not template_dir:
+            return None
         template_file = os.path.join(template_dir, template.template_file)
         
         if os.path.exists(template_file):
@@ -529,7 +557,9 @@ class TemplateManager:
                     resolved[field.source] = self.config.get(config_key, [])
         
         # 处理嵌套 columns 中的 source（需要读取原始 schema）
-        template_path = os.path.join(self.templates_dir, template_id)
+        template_path = self._get_template_source_dir(template_id)
+        if template_path is None:
+            template_path = os.path.join(self.templates_dir, template_id)
         schema_path = os.path.join(template_path, "schema.yaml")
         if os.path.exists(schema_path):
             try:
@@ -753,7 +783,9 @@ class TemplateManager:
             return False, [f"Template not found: {template_id}"]
         
         # 从模板目录读取 schema.yaml 获取依赖声明
-        template_path = os.path.join(self.templates_dir, template_id)
+        template_path = self._get_template_source_dir(template_id)
+        if template_path is None:
+            template_path = os.path.join(self.templates_dir, template_id)
         schema_path = os.path.join(template_path, "schema.yaml")
         
         if not os.path.exists(schema_path):
@@ -831,6 +863,7 @@ class TemplateManager:
         
         self._templates.clear()
         self._template_versions.clear()
+        self._template_source_dirs.clear()
         self._load_all_templates()
     
     def get_template_details(self, template_id: str) -> Optional[Dict[str, Any]]:
@@ -847,7 +880,9 @@ class TemplateManager:
         if not template:
             return None
         
-        template_path = os.path.join(self.templates_dir, template_id)
+        template_path = self._get_template_source_dir(template_id)
+        if template_path is None:
+            template_path = os.path.join(self.templates_dir, template_id)
         schema_path = os.path.join(template_path, "schema.yaml")
         docx_path = os.path.join(template_path, "template.docx")
         
@@ -881,7 +916,7 @@ class TemplateManager:
     
     def delete_template(self, template_id: str) -> Tuple[bool, str]:
         """
-        删除指定模板
+        删除指定模板（仅允许删除用户自定义模板）
         
         Args:
             template_id: 模板ID
@@ -895,22 +930,29 @@ class TemplateManager:
         if template_id not in self._templates:
             return False, f"模板不存在: {template_id}"
         
+        # 内置模板不可删除
+        source_dir = self._template_source_dirs.get(template_id)
+        if source_dir is None or os.path.abspath(source_dir) == os.path.abspath(self.templates_dir):
+            return False, "内置模板不可删除"
+        
         # 防止删除默认模板
         if template_id == self.default_template_id and len(self._templates) == 1:
             return False, "无法删除唯一的模板"
         
-        template_path = os.path.join(self.templates_dir, template_id)
+        template_path = source_dir
         
         try:
             # 删除模板目录
             if os.path.exists(template_path):
                 shutil.rmtree(template_path)
-                logger.info(f"Deleted template directory: {template_path}")
+                logger.info(f"Deleted user template directory: {template_path}")
             
             # 从内存中移除
             del self._templates[template_id]
             if template_id in self._template_versions:
                 del self._template_versions[template_id]
+            if template_id in self._template_source_dirs:
+                del self._template_source_dirs[template_id]
             
             return True, f"模板 {template_id} 已删除"
         except Exception as e:
@@ -925,6 +967,17 @@ class TemplateManager:
     def template_ids(self) -> List[str]:
         """获取所有模板ID"""
         return list(self._templates.keys())
+    
+    @property
+    def user_template_ids(self) -> List[str]:
+        """获取用户自定义模板ID列表"""
+        if not self.user_templates_dir:
+            return []
+        user_dir = os.path.abspath(self.user_templates_dir)
+        return [
+            tid for tid, src in self._template_source_dirs.items()
+            if os.path.abspath(src) == user_dir
+        ]
     
     @property
     def default_template_id(self) -> Optional[str]:

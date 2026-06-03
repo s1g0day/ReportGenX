@@ -1,6 +1,6 @@
 {
   "name": "report-electron-app",
-  "version": "0.20.2",
+  "version": "0.21.0",
   "description": "Electron version of ReportGenX",
   "repository": {
     "type": "git",
@@ -71,7 +71,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": true
+      "deleteAppDataOnUninstall": false
     },
     "mac": {
       "target": [

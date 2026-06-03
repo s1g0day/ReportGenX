@@ -43,9 +43,21 @@ def get_log_directory() -> Path:
     """
     获取日志目录路径
     
+    优先级:
+    1. REPORTGENX_USERDATA_DIR 环境变量 (生产环境由 Electron 设置)
+    2. PyInstaller frozen 模式: 从可执行文件位置推导
+    3. 开发环境: 从当前文件位置推导
+    
     Returns:
         日志目录的 Path 对象
     """
+    # 优先检查环境变量（生产环境 Electron 传递 userData 路径）
+    userdata_dir = os.getenv('REPORTGENX_USERDATA_DIR')
+    if userdata_dir:
+        log_dir = Path(userdata_dir) / 'output' / 'logs'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        return log_dir
+
     # 检测是否为 PyInstaller 打包环境
     if getattr(sys, 'frozen', False):
         # 打包后: resources/backend/dist/api/api.exe
