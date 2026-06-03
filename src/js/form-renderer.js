@@ -2329,40 +2329,46 @@ window.AppFormRenderer = {
                 window.lastReportPath = result.report_path;
                 if (window.AppUtils) AppUtils.showToast(`报告生成成功！\n路径：${result.report_path}`, 'success');
 
-                // Bug 1 fix: Prompt to save custom vulnerability name to the library
-                const vulnName = data['vul_name'];
-                if (vulnName && String(vulnName).trim()) {
-                    const trimmedName = String(vulnName).trim();
-                    const vulnList = (window.AppVulnManager && window.AppVulnManager.VULN_LIST) || [];
-                    const exists = vulnList.some(v => {
-                        const n = window.AppVulnManager.getValue
-                            ? window.AppVulnManager.getValue(v, ['Vuln_Name', 'name', 'vuln_name', '漏洞名称'])
-                            : (v.Vuln_Name || v.name || v.vuln_name);
-                        return n && String(n).trim() === trimmedName;
-                    });
+                // Prompt to save custom vulnerability name to the library (template-driven)
+                const vulnSave = this.currentSchema?.vuln_save;
+                if (vulnSave && vulnSave.name_field) {
+                    const vulnName = data[vulnSave.name_field];
+                    if (vulnName && String(vulnName).trim()) {
+                        const trimmedName = String(vulnName).trim();
+                        const vulnList = (window.AppVulnManager && window.AppVulnManager.VULN_LIST) || [];
+                        const exists = vulnList.some(v => {
+                            const n = window.AppVulnManager.getValue
+                                ? window.AppVulnManager.getValue(v, ['Vuln_Name', 'name', 'vuln_name', '漏洞名称'])
+                                : (v.Vuln_Name || v.name || v.vuln_name);
+                            return n && String(n).trim() === trimmedName;
+                        });
 
-                    if (!exists) {
-                        const confirmed = await AppUtils.safeConfirm(
-                            `漏洞"${trimmedName}"不在漏洞库中，是否保存到漏洞库？`
-                        );
-                        if (confirmed) {
-                            try {
-                                const vulnData = {
-                                    name: trimmedName,
-                                    description: data['vul_description'] || '',
-                                    impact: data['vul_harm'] || '',
-                                    suggestion: data['repair_suggestion'] || '',
-                                    level: data['hazard_level'] || '中危'
-                                };
-                                await AppAPI.saveVulnerability(vulnData);
-                                AppUtils.showToast('漏洞已保存到漏洞库', 'success');
-                                // Refresh the VULN_LIST in VulnManager
-                                if (window.AppVulnManager && window.AppVulnManager.loadVulnerabilities) {
-                                    await window.AppVulnManager.loadVulnerabilities();
+                        if (!exists) {
+                            const confirmed = await AppUtils.safeConfirm(
+                                `漏洞"${trimmedName}"不在漏洞库中，是否保存到漏洞库？`
+                            );
+                            if (confirmed) {
+                                try {
+                                    // Build vulnData from schema mapping
+                                    const vulnData = {};
+                                    if (vulnSave.mapping) {
+                                        for (const [dbKey, formKey] of Object.entries(vulnSave.mapping)) {
+                                            vulnData[dbKey] = data[formKey] || '';
+                                        }
+                                    }
+                                    // Fallback: ensure required fields
+                                    vulnData.name = vulnData.name || trimmedName;
+                                    vulnData.level = vulnData.level || '中危';
+                                    await AppAPI.saveVulnerability(vulnData);
+                                    AppUtils.showToast('漏洞已保存到漏洞库', 'success');
+                                    // Refresh the VULN_LIST in VulnManager
+                                    if (window.AppVulnManager && window.AppVulnManager.loadVulnerabilities) {
+                                        await window.AppVulnManager.loadVulnerabilities();
+                                    }
+                                } catch (e) {
+                                    console.error('Save vulnerability failed:', e);
+                                    AppUtils.showToast('保存漏洞失败: ' + e.message, 'error');
                                 }
-                            } catch (e) {
-                                console.error('Save vulnerability failed:', e);
-                                AppUtils.showToast('保存漏洞失败: ' + e.message, 'error');
                             }
                         }
                     }

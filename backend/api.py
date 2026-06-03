@@ -1736,7 +1736,8 @@ def get_template_data_sources(template_id: str):
 @app.get("/api/templates/{template_id}/widgets/{filename}")
 def get_template_widget(template_id: str, filename: str):
     """Serve template widget files (JS / CSS)."""
-    widget_path = os.path.join(TEMPLATES_DIR, template_id, "widgets", filename)
+    tm = get_template_manager()
+    widget_path = os.path.join(tm.get_template_dir(template_id), "widgets", filename)
     if ".." in filename or not os.path.exists(widget_path):
         raise HTTPException(status_code=404, detail="Widget not found")
     ext = os.path.splitext(filename)[1].lower()
@@ -1917,7 +1918,8 @@ def check_template_dependencies(template_id: str):
 @app.get("/api/templates/{template_id}/export")
 def export_template(template_id: str):
     """导出模板为压缩包"""
-    template_dir = os.path.join(TEMPLATES_DIR, template_id)
+    tm = get_template_manager()
+    template_dir = tm.get_template_dir(template_id)
     if not os.path.exists(template_dir):
         raise HTTPException(status_code=404, detail=f"Template not found: {template_id}")
     
@@ -1950,11 +1952,12 @@ def batch_export_templates(template_ids: list[str]):
     if not template_ids:
         raise HTTPException(status_code=400, detail="No template IDs provided")
     
+    tm = get_template_manager()
     # 创建内存中的 ZIP 文件
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
         for template_id in template_ids:
-            template_dir = os.path.join(TEMPLATES_DIR, template_id)
+            template_dir = tm.get_template_dir(template_id)
             if not os.path.exists(template_dir):
                 logger.warning(f"Template not found: {template_id}")
                 continue

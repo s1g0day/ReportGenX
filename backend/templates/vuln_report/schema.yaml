@@ -423,3 +423,15 @@ preview:
       label: 级别
     - key: url
       label: 目标
+
+# --- 漏洞库保存配置 ---
+# 声明哪些表单字段映射到漏洞库列
+# 不声明此段则跳过自动入库
+vuln_save:
+  name_field: vul_name
+  mapping:
+    name: vul_name
+    description: vul_description
+    impact: vul_harm
+    suggestion: repair_suggestion
+    level: hazard_level

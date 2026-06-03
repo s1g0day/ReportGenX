@@ -473,7 +473,7 @@ class TemplateManager:
         if not template:
             return None
         
-        return {
+        result = {
             "id": template.id,
             "name": template.name,
             "description": template.description,
@@ -499,7 +499,37 @@ class TemplateManager:
             "dependent_fields": template.dependent_fields,
             "summary_configs": template.summary_configs
         }
+
+        # Inject raw schema fields not captured by TemplateInfo (e.g. vuln_save)
+        template_path = self.get_template_dir(template_id)
+        schema_path = os.path.join(template_path, "schema.yaml")
+        if os.path.exists(schema_path):
+            try:
+                with open(schema_path, 'r', encoding='utf-8') as f:
+                    raw_schema = yaml.safe_load(f)
+                if raw_schema and 'vuln_save' in raw_schema:
+                    result['vuln_save'] = raw_schema['vuln_save']
+            except Exception as e:
+                logger.warning(f"Failed to read raw schema for {template_id}: {e}")
+
+        return result
     
+    def get_template_dir(self, template_id: str) -> str:
+        """获取模板的实际源目录（内置或用户目录）。
+        
+        优先返回用户模板目录路径（存储在 _template_source_dirs 中为完整路径），
+        若未找到则回退到内置模板目录拼接。
+        
+        Args:
+            template_id: 模板ID
+            
+        Returns:
+            模板的源目录完整路径
+        """
+        if template_id in self._template_source_dirs:
+            return self._template_source_dirs[template_id]
+        return os.path.join(self.templates_dir, template_id)
+
     def _get_template_source_dir(self, template_id: str) -> Optional[str]:
         """获取模板的实际源目录（内置或用户目录）。"""
         return self._template_source_dirs.get(template_id, self.templates_dir)

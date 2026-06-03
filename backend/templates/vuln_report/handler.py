@@ -194,7 +194,7 @@ def execute(
     from backend.core.logger import setup_logger
     from backend.core.schema_loader import SchemaLoader
 
-    template_dir = os.path.join(template_manager.templates_dir, template_id)
+    template_dir = template_manager.get_template_dir(template_id)
     template_info = SchemaLoader.load_schema(template_dir)
     runtime_cfg = SchemaLoader.load_runtime(template_dir)
 
