@@ -26,6 +26,7 @@ from docx import Document
 from docx.document import Document as DocxDocument
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+from docx.shared import RGBColor
 
 from .data_reader_db import DbDataReader
 from .document_editor import DocumentEditor
@@ -222,6 +223,18 @@ class GenerationContext:
             self._img_processor = DocumentImageProcessor(self._doc, [])
         return self._img_processor
 
+    # ── Helpers ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_hex_color(hex_str: str):
+        """Parse '#RRGGBB' hex string to RGBColor."""
+        if not hex_str or not hex_str.startswith('#'):
+            return None
+        try:
+            return RGBColor(int(hex_str[1:3], 16), int(hex_str[3:5], 16), int(hex_str[5:7], 16))
+        except (ValueError, IndexError):
+            return None
+
     # ── Text replacement ───────────────────────────────────────────
 
     def replace_text(
@@ -241,6 +254,13 @@ class GenerationContext:
         kwargs = {'enable_risk_color': enable_risk_color}
         if risk_key is not None:
             kwargs['risk_key'] = risk_key
+        # Build risk colors from config if available (falls back to built-in table)
+        risk_levels = self.config.get('risk_levels', [])
+        if risk_levels:
+            kwargs['risk_colors'] = {
+                r['value']: self._parse_hex_color(r.get('color', ''))
+                for r in risk_levels if r.get('color')
+            }
         self.editor.replace_report_text(replacements, **kwargs)
 
     def replace_text_colored(self, replacements: Dict[str, str]) -> None:
@@ -324,7 +344,7 @@ class GenerationContext:
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
-                    if target_keyword in cell.text:
+                    if target_keyword in (cell.text or ''):
                         target_cell = cell
                         target_cell_text = cell.text
                         break
@@ -341,9 +361,9 @@ class GenerationContext:
             }
             if is_placeholder_only:
                 for para in target_cell.paragraphs:
-                    if target_keyword in para.text:
+                    if target_keyword in (para.text or ''):
                         para.text = para.text.replace(target_keyword, '')
-                    if placeholder in para.text:
+                    if placeholder in (para.text or ''):
                         para.text = para.text.replace(placeholder, '')
                 self.img_processor.insert_images_into_cell(target_cell, normalized)
             else:
@@ -353,7 +373,7 @@ class GenerationContext:
         # Fallback: paragraph-based placeholder
         target_para_text = None
         for para in doc.paragraphs:
-            if target_keyword in para.text:
+            if target_keyword in (para.text or ''):
                 target_para_text = para.text
                 break
 
@@ -785,7 +805,7 @@ class GenerationContext:
 
         output_config = self.template_info.output_config
         filename_pattern = output_config.get(
-            'filename_pattern', '{vul_name}_{date}.docx'
+            'filename_pattern', 'report_{date}.docx'
         )
         output_dir_pattern = output_config.get('output_dir', '')
 

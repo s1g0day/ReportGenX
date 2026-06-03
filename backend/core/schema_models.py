@@ -49,7 +49,7 @@ def validate_template_id(template_id: str) -> bool:
     规则：
     - 只允许字母、数字、下划线
     - 不能以数字开头
-    - 推荐使用 snake_case 命名（如 vuln_report）
+    - 推荐使用 snake_case 命名（如 my_template）
 
     Args:
         template_id: 模板 ID
@@ -58,7 +58,7 @@ def validate_template_id(template_id: str) -> bool:
         bool: 是否有效
 
     Examples:
-        >>> validate_template_id("vuln_report")
+        >>> validate_template_id("my_template")
         True
         >>> validate_template_id("my-template")
         False
@@ -232,7 +232,7 @@ class TemplateInfo(BaseModel):
     def validate_template_id_field(cls, v: str) -> str:
         """验证模板 ID 格式 (snake_case)"""
         if not validate_template_id(v):
-            raise ValueError(f"Invalid template ID format: {v}. Must be snake_case (e.g., vuln_report)")
+            raise ValueError(f"Invalid template ID format: {v}. Must be snake_case (e.g., my_template)")
         return v
 
     @field_validator('version')

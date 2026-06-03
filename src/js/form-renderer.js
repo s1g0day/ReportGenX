@@ -814,10 +814,12 @@ window.AppFormRenderer = {
         // 配置驱动的字段联动 - 替代硬编码的模板判断
         this.handleDependentFieldUpdate(field.key, value);
 
-        // 漏洞数量变化时自动计算漏洞总数和风险评级
-        const vulnCountFields = ['vuln_count_critical', 'vuln_count_high', 'vuln_count_medium', 'vuln_count_low', 'vuln_count_info'];
-        if (vulnCountFields.includes(field.key)) {
-            this.autoCalculateRiskLevel();
+        // Schema-driven behavior trigger: scan behaviors with trigger.fields (multi-field arrays)
+        const schemaBehaviors = this.currentSchema?.behaviors || [];
+        for (const beh of schemaBehaviors) {
+            if (beh.trigger && Array.isArray(beh.trigger.fields) && beh.trigger.fields.includes(field.key)) {
+                this.executeBehaviorFromSchema(beh);
+            }
         }
     },
 
@@ -859,8 +861,15 @@ window.AppFormRenderer = {
 
         try {
             const baseUrl = window.AppAPI?.BASE_URL || '';
-            const url = `${baseUrl}/api/templates/${templateId}/widgets/${widgetFile}`;
-            const textResponse = await fetch(url);
+            let url = `${baseUrl}/api/templates/${templateId}/widgets/${widgetFile}`;
+            let textResponse = await fetch(url);
+
+            // Fallback: if template-local widget not found, try shared widget
+            if (!textResponse.ok) {
+                const sharedUrl = `${baseUrl}/api/widgets/shared/${widgetFile}`;
+                textResponse = await fetch(sharedUrl);
+            }
+
             if (!textResponse.ok) throw new Error(`Failed to load widget: ${textResponse.status}`);
             const code = await textResponse.text();
 
@@ -1975,61 +1984,73 @@ window.AppFormRenderer = {
     },
 
     // Pre-compute derived variables for computed_template substitution.
-    // These variables (${_effective_high_vulns}, ${_system_count}, etc.) are
-    // not in formData directly — they require scanning arrays, counting, and
-    // deduplication. This method fills them into formData so that the generic
-    // updateTemplateField() can find them during regex replacement.
+    // Schema-driven: reads pre_compute config from the dependent_fields entry.
+    // Supports: count vulns, count servers, count DB, data summary.
     _computeTemplateVars(targetKey, config) {
-        // report_conclusion: Attack_Defense template auto-generated conclusion
-        if (targetKey === 'report_conclusion') {
-            // 1. Count effective high-risk vulns (internet + intranet, counting
-            //    by URL lines; each URL line = 1 vuln instance).
-            const internetVulns = this.formData['internet_vulns'] || [];
-            const intranetVulns = this.formData['intranet_vulns'] || [];
-            const allVulns = [...internetVulns, ...intranetVulns];
+        // Find the computed_template entry for this targetKey (config is the dependent_field entry)
+        const ctEntry = config;
+        if (!ctEntry || !ctEntry.pre_compute) return;
 
-            let criticalCount = 0, highCount = 0;
+        const pc = ctEntry.pre_compute;
+        const result = {};
+
+        // Count vulns (aggregate internet + intranet vuln arrays)
+        if (pc.count_vulns) {
+            const cv = pc.count_vulns;
+            const allVulns = [];
+            (cv.source || []).forEach(srcKey => {
+                const arr = this.formData[srcKey] || [];
+                allVulns.push(...arr);
+            });
+
+            let criticalHigh = 0;
             const systems = new Set();
 
             allVulns.forEach(vuln => {
-                const level = vuln.vuln_level || '中危';
-                const vulnUrl = vuln.vuln_url || '';
-                const urlLines = vulnUrl.split('\n').filter(line => line.trim()).length;
+                const level = vuln[cv.level_field] || '中危';
+                const urlLines = (vuln[cv.url_field] || '').split('\n').filter(l => l.trim()).length;
                 const count = Math.max(1, urlLines);
 
-                if (level === '超危') criticalCount += count;
-                else if (level === '高危') highCount += count;
+                if (level === '超危' || level === '高危') {
+                    criticalHigh += count;
+                }
 
-                const system = (vuln.vuln_system || '').trim();
-                if (system) systems.add(system);
+                const sys = (vuln[cv.system_field] || '').trim();
+                if (sys) systems.add(sys);
             });
 
-            // 2. Controlled servers count
-            const servers = this.formData['controlled_servers'] || [];
-            const serverCount = servers.length;
+            result.count_high_critical_vulns = criticalHigh;
+            result.unique_systems = systems.size;
+        }
 
-            // 3. DB connections count
-            const dbConnections = this.formData['db_connections'] || [];
-            const dbCount = dbConnections.length;
+        // Count servers
+        if (pc.count_servers) {
+            result.server_count = (this.formData[pc.count_servers.source] || []).length;
+        }
 
-            // 4. Total data count (already a number)
-            const totalDataCount = this.formData['total_data_count'] || 0;
+        // Count DB connections
+        if (pc.count_db) {
+            result.db_count = (this.formData[pc.count_db.source] || []).length;
+        }
 
-            // 5. Data types (from data_statistics array)
-            const dataStatistics = this.formData['data_statistics'] || [];
-            const dataTypes = new Set();
-            dataStatistics.forEach(stat => {
-                const dataType = (stat.data_type || '').trim();
-                if (dataType) dataTypes.add(dataType);
+        // Data summary
+        if (pc.data_summary) {
+            const ds = pc.data_summary;
+            result.total_data = this.formData[ds.total_field] || 0;
+            const stats = this.formData[ds.statistics_field] || [];
+            const types = new Set();
+            stats.forEach(s => {
+                const t = (s[ds.type_field] || '').trim();
+                if (t) types.add(t);
             });
+            result.data_type_list = types.size > 0 ? Array.from(types).sort().join('、') : '';
+        }
 
-            // Store computed values into formData for template substitution
-            this.formData['_effective_high_vulns'] = criticalCount + highCount;
-            this.formData['_system_count'] = systems.size;
-            this.formData['_server_count'] = serverCount;
-            this.formData['_db_count'] = dbCount;
-            this.formData['_total_data_count'] = totalDataCount;
-            this.formData['_data_types'] = dataTypes.size > 0 ? Array.from(dataTypes).sort().join('、') : '';
+        // Write output variables into formData
+        if (pc.output) {
+            for (const [targetVar, sourceVar] of Object.entries(pc.output)) {
+                this.formData[targetVar] = result[sourceVar] !== undefined ? result[sourceVar] : '';
+            }
         }
     },
 
@@ -2083,33 +2104,84 @@ window.AppFormRenderer = {
         }
     },
 
-    // 自动计算风险评级（penetration_test: vuln_count_* 变化时触发）
-    autoCalculateRiskLevel() {
-        const critical = parseInt(this.formData['vuln_count_critical'] || '0', 10);
-        const high = parseInt(this.formData['vuln_count_high'] || '0', 10);
-        const medium = parseInt(this.formData['vuln_count_medium'] || '0', 10);
-        const low = parseInt(this.formData['vuln_count_low'] || '0', 10);
-        const info = parseInt(this.formData['vuln_count_info'] || '0', 10);
+    // Schema-driven behavior executor: dispatches action types from behaviors
+    // with trigger.fields (multi-field array triggers)
+    executeBehaviorFromSchema(beh) {
+        if (!beh || !beh.actions) return;
+        for (const action of beh.actions) {
+            if (action.type === 'risk_compute') {
+                this._executeRiskCompute(action);
+            }
+        }
+    },
 
-        const total = critical + high + medium + low + info;
-        this.setFieldValue('vuln_count_total', String(total));
+    // Execute risk_compute action: sum source fields, evaluate thresholds, set risk level
+    _executeRiskCompute(action) {
+        if (!action.source_fields || !action.thresholds) return;
 
-        let riskLevel = '低风险';
-        if (critical >= 1 || high >= 1 || medium > 6) {
-            riskLevel = '高风险';
-        } else if ((medium >= 1 && medium <= 6) || low > 8) {
-            riskLevel = '中风险';
-        } else if (low <= 5) {
-            riskLevel = '低风险';
+        // Sum source fields
+        let total = 0;
+        action.source_fields.forEach(sf => {
+            total += parseInt(this.formData[sf] || '0', 10);
+        });
+        if (action.sum_target) {
+            this.setFieldValue(action.sum_target, String(total));
         }
 
-        const riskField = this.currentSchema?.fields?.find(f => f.key === 'overall_risk_level');
+        // Evaluate thresholds in order (rely on YAML dict ordering for priority)
+        let riskLevel = null;
+        const levels = Object.entries(action.thresholds);
+        for (const [level, condition] of levels) {
+            if (this._evalRiskCondition(condition, action.source_fields)) {
+                riskLevel = level;
+                break;
+            }
+        }
+        // Fallback: if no threshold matched, default to the last defined level
+        if (!riskLevel) {
+            if (levels.length === 0) return;
+            riskLevel = levels[levels.length - 1][0];
+        }
+
+        const targetKey = action.target_key || 'overall_risk_level';
+        const riskField = this.currentSchema?.fields?.find(f => f.key === targetKey);
         if (riskField) {
-            this.setFieldValue('overall_risk_level', riskLevel);
+            this.setFieldValue(targetKey, riskLevel);
             if (riskField.presets && riskField.presets[riskLevel]) {
                 this.applyPresets(riskField.presets[riskLevel]);
             }
         }
+    },
+
+    // Evaluate a risk condition string like "critical>=1 || high>=1 || medium>6"
+    // against formData. Comma = OR, & = AND within a level.
+    _evalRiskCondition(condition, sourceFields) {
+        if (!condition) return false;
+        // Build a safe evaluation: replace each known field key with its numeric value
+        let expr = condition;
+        for (const sf of sourceFields) {
+            const val = parseInt(this.formData[sf] || '0', 10);
+            expr = expr.replace(new RegExp('\\b' + sf + '\\b', 'g'), String(val));
+        }
+        // Remaining bare identifiers → treat as 0 (shouldn't happen with valid configs)
+        expr = expr.replace(/\b[a-zA-Z_]\w*\b/g, '0');
+        // Comma → ||, & → &&
+        expr = expr.replace(/,/g, ' || ').replace(/&/g, ' && ');
+        try {
+            return !!(Function('"use strict"; return (' + expr + ')')());
+        } catch (_e) {
+            console.warn('[FormRenderer] Failed to evaluate risk condition:', condition, _e);
+            return false;
+        }
+    },
+
+    // 自动计算风险评级（schema-driven: reads from compute_risk_level behavior config）
+    // Kept for backward compatibility — autoCalculateRiskLevel() is also called directly
+    // from widget-level submit, but now delegates to the schema behavior if available.
+    autoCalculateRiskLevel() {
+        const behavior = (this.currentSchema?.behaviors || []).find(b => b.id === 'compute_risk_level');
+        if (!behavior) return;
+        this.executeBehaviorFromSchema(behavior);
     },
 
     // 创建多选复选框组（带文本框）
@@ -2247,17 +2319,17 @@ window.AppFormRenderer = {
                 }
             }
             
-            // widget 类型数据验证：检查数组条目是否有空的名称字段
-            if (f.type === 'widget' && data[f.key] && Array.isArray(data[f.key]) && data[f.key].length > 0) {
-                const emptyVulns = [];
-                data[f.key].forEach((vuln, idx) => {
-                    // 检查漏洞名称是否为空
-                    if (!vuln.vuln_name || !vuln.vuln_name.trim()) {
-                        emptyVulns.push(idx + 1);
+            // widget 类型数据验证：schema-driven, check empty name fields
+            if (f.type === 'widget' && f.validate && data[f.key] && Array.isArray(data[f.key]) && data[f.key].length > 0) {
+                const vcfg = f.validate;
+                const emptyItems = [];
+                data[f.key].forEach((item, idx) => {
+                    if (!item[vcfg.name_field] || !item[vcfg.name_field].trim()) {
+                        emptyItems.push(idx + 1);
                     }
                 });
-                if (emptyVulns.length > 0) {
-                    errors.push(`漏洞 ${emptyVulns.join('、')} 未填写漏洞名称，请填写或删除空条目`);
+                if (emptyItems.length > 0) {
+                    errors.push(vcfg.item_label + ' ' + emptyItems.join('、') + ' 未填写名称，请填写或删除空条目');
                 }
             }
         });

@@ -1,4 +1,4 @@
-/* vuln_list widget styles */
+/* vuln_list widget styles — shared across all templates */
 .dynamic-vuln-list-container {
     display: flex;
     gap: 20px;

@@ -161,10 +161,10 @@ class DocumentImageProcessor:
         for table in self.doc.tables:
             for row in table.rows:
                 for cell in row.cells:
-                    if placeholder in cell.text:
+                    if placeholder in (cell.text or ''):
                         # 清除占位符文本
                         for para in cell.paragraphs:
-                            if placeholder in para.text:
+                            if placeholder in (para.text or ''):
                                 para.text = para.text.replace(placeholder, '')
                         # 如果有图片，插入到单元格
                         if image_list:
@@ -173,7 +173,7 @@ class DocumentImageProcessor:
         # 2. 收集需要处理的段落（避免在迭代中修改导致索引错乱）
         target_paragraphs = []
         for para in self.doc.paragraphs:
-            if placeholder in para.text:
+            if placeholder in (para.text or ''):
                 target_paragraphs.append(para)
         
         for para in target_paragraphs:

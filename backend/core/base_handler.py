@@ -52,7 +52,7 @@ class BaseTemplateHandler(ABC):
         初始化处理器
         
         Args:
-            template_dir: 模板目录绝对路径 (e.g. backend/templates/vuln_report)
+            template_dir: 模板目录绝对路径 (e.g. backend/templates/my_template)
             template_info: TemplateInfo Pydantic 模型实例
             config: 全局配置
         """
@@ -214,7 +214,7 @@ class BaseTemplateHandler(ABC):
         获取数据库表名 - 子类可覆盖
         
         Returns:
-            表名，如 "vuln_report", "intrusion_report"
+            表名，如 "my_template"
         """
         return ""
     
@@ -347,7 +347,7 @@ class BaseTemplateHandler(ABC):
         output_config = self.template_info.output_config
         
         # 解析文件名模式
-        filename_pattern = output_config.get('filename_pattern', '{vul_name}_{date}.docx')
+        filename_pattern = output_config.get('filename_pattern', 'report_{date}.docx')
         output_dir_pattern = output_config.get('output_dir', '')
         
         # 替换变量
@@ -701,7 +701,8 @@ class BaseTemplateHandler(ABC):
         
         子类只需实现 _build_output_filename() 即可
         """
-        unit_name = data.get('unit_name', 'Unknown')
+        unit_field = self.template_info.output_config.get('unit_field', 'unit_name')
+        unit_name = data.get(unit_field, 'Unknown')
         filename = self._build_output_filename(data)
         return self.build_output_path(self.output_dir, unit_name, filename)
     
@@ -824,7 +825,7 @@ class BaseTemplateHandler(ABC):
         for table in img_processor.doc.tables:
             for row in table.rows:
                 for cell in row.cells:
-                    if target_keyword in cell.text:
+                    if target_keyword in (cell.text or ''):
                         target_cell = cell
                         target_cell_text = cell.text
                         break
@@ -844,9 +845,9 @@ class BaseTemplateHandler(ABC):
 
             if is_placeholder_only_cell:
                 for para in target_cell.paragraphs:
-                    if target_keyword in para.text:
+                    if target_keyword in (para.text or ''):
                         para.text = para.text.replace(target_keyword, '')
-                    if placeholder in para.text:
+                    if placeholder in (para.text or ''):
                         para.text = para.text.replace(placeholder, '')
                 img_processor.insert_images_into_cell(target_cell, normalized_images)
             else:
@@ -858,7 +859,7 @@ class BaseTemplateHandler(ABC):
         # - 混合文本段落：退回逐图插入，避免删除正文
         target_paragraph_text = None
         for para in img_processor.doc.paragraphs:
-            if target_keyword in para.text:
+            if target_keyword in (para.text or ''):
                 target_paragraph_text = para.text
                 break
 

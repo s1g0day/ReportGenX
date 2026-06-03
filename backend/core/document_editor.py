@@ -176,18 +176,20 @@ class DocumentEditor:
                     new_r.font.size = font_size
                 new_r.font.bold = font_bold
 
-    def replace_report_text(self, replacements, enable_risk_color=False, risk_key="#overall_risk_level#"):
+    def replace_report_text(self, replacements, enable_risk_color=False, risk_key=None, risk_colors=None):
         """
         替换文档中的占位符
         
         Args:
             replacements: 占位符替换字典
             enable_risk_color: 是否启用风险等级颜色（仅渗透测试报告使用）
-            risk_key: 风险等级占位符 key，默认 "#overall_risk_level#"
+            risk_key: 风险等级占位符 key
+            risk_colors: 风险等级->颜色映射 (优先于 built-in RISK_LEVEL_COLORS)
         """
         # 风险等级占位符
         risk_level_key = risk_key
         risk_level_value = replacements.get(risk_level_key, "")
+        colors = risk_colors if risk_colors is not None else RISK_LEVEL_COLORS
         
         # 1. 处理段落 (Paragraphs)
         paragraphs_to_process = list(self.doc.paragraphs)
@@ -199,8 +201,8 @@ class DocumentEditor:
             full_text = paragraph.text
             
             # 特殊处理：风险等级带颜色（仅当启用时）
-            if enable_risk_color and risk_level_key in full_text and risk_level_value in RISK_LEVEL_COLORS:
-                color = RISK_LEVEL_COLORS[risk_level_value]
+            if enable_risk_color and risk_level_key and risk_level_key in full_text and risk_level_value in colors:
+                color = colors[risk_level_value]
                 self._replace_with_color(paragraph, risk_level_key, risk_level_value, color)
                 full_text = paragraph.text
                 # 继续处理其他占位符
@@ -274,10 +276,10 @@ class DocumentEditor:
                          
                     for paragraph in cell.paragraphs:
                         full_text = paragraph.text
-                        
+
                         # 特殊处理：表格中的风险等级带颜色（仅当启用时）
-                        if enable_risk_color and risk_level_key in full_text and risk_level_value in RISK_LEVEL_COLORS:
-                            color = RISK_LEVEL_COLORS[risk_level_value]
+                        if enable_risk_color and risk_level_key and risk_level_key in full_text and risk_level_value in colors:
+                            color = colors[risk_level_value]
                             self._replace_with_color(paragraph, risk_level_key, risk_level_value, color)
                             # 继续处理其他占位符
                             full_text = paragraph.text
@@ -285,7 +287,7 @@ class DocumentEditor:
                                 if key != risk_level_key and key in full_text:
                                     full_text = full_text.replace(key, str(value))
                             continue
-                        
+
                         is_modified = False
                         for key, value in replacements.items():
                             if key in full_text:
@@ -311,7 +313,7 @@ class DocumentEditor:
         # 查找占位符所在段落
         target_para = None
         for para in self.doc.paragraphs:
-            if placeholder in para.text:
+            if placeholder in (para.text or ''):
                 target_para = para
                 break
         

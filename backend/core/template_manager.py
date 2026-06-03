@@ -52,7 +52,7 @@ def validate_path_safety(path: str, base_dir: str) -> bool:
         bool: 路径是否安全
         
     Examples:
-        >>> validate_path_safety("templates/vuln_report", "templates")
+        >>> validate_path_safety("templates/my_template", "templates")
         True
         >>> validate_path_safety("../../../etc/passwd", "templates")
         False
@@ -716,7 +716,7 @@ class TemplateManager:
         output_config = template.output_config
         
         # 解析文件名模式
-        filename_pattern = output_config.get('filename_pattern', '{vul_name}_{date}.docx')
+        filename_pattern = output_config.get('filename_pattern', 'report_{date}.docx')
         output_dir_pattern = output_config.get('output_dir', '')
         
         # 替换变量

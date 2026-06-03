@@ -1744,6 +1744,17 @@ def get_template_widget(template_id: str, filename: str):
     media_map = {".js": "application/javascript", ".css": "text/css"}
     return FileResponse(path=widget_path, media_type=media_map.get(ext, "application/octet-stream"))
 
+@app.get("/api/widgets/shared/{filename}")
+def get_shared_widget(filename: str):
+    """Serve shared widget files (JS / CSS) from the common widgets directory."""
+    shared_dir = os.path.join(os.path.dirname(__file__), "widgets")
+    widget_path = os.path.join(shared_dir, filename)
+    if ".." in filename or not os.path.exists(widget_path):
+        raise HTTPException(status_code=404, detail="Shared widget not found")
+    ext = os.path.splitext(filename)[1].lower()
+    media_map = {".js": "application/javascript", ".css": "text/css"}
+    return FileResponse(path=widget_path, media_type=media_map.get(ext, "application/octet-stream"))
+
 @app.post("/api/templates/{template_id}/validate")
 def validate_template_data(template_id: str, data: dict[str, Any]):
     """验证表单数据"""

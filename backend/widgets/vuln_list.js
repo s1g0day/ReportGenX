@@ -1,8 +1,9 @@
-// vuln_list.js — Dynamic vulnerability list widget
+// vuln_list.js — Shared generic vulnerability list widget
 // Factory: window.__widgetFactories['vuln_list'](field, callbacks) → { container, destroy }
 //
-// Migrated from form-renderer.js (PR2.2: Widget Extraction)
-// Adapted to use callbacks instead of this.xxx() for framework independence.
+// Schema-driven: reads field.columns for layout, field.vuln_fill for library mappings.
+// Merged from 4 near-identical template-local copies into 1 shared widget.
+// Supports image_uploader widget_type for template-specific extra uploaders (e.g. intranet_vuln).
 
 (function() {
     window.__widgetFactories = window.__widgetFactories || {};
@@ -12,7 +13,7 @@
         var dataArray = callbacks.getData() || [];
         var activeIndex = null;
 
-        // ── Helper: Update data and notify framework ────────────────────
+        // ── Clean: notify framework of data changes ──────────────────────
         function notifyDataChanged() {
             callbacks.setData(dataArray);
         }
@@ -61,87 +62,147 @@
             ];
         }
 
-        // ── Vuln Card Content ───────────────────────────────────────────
+        // ── Resolve select options from column config ────────────────────
+        function resolveSelectOptions(column) {
+            if (!column) return null;
+            // Direct options from schema
+            if (column.options && Array.isArray(column.options)) {
+                return column.options;
+            }
+            // Resolve from source (e.g. config.risk_levels)
+            if (column.source) {
+                var ds = callbacks.dataSources;
+                var sourceKey = column.source.replace(/^config\./, '');
+                if (ds && ds['config.' + sourceKey]) {
+                    return ds['config.' + sourceKey].map(function(item) {
+                        return { value: item.value, label: item.label };
+                    });
+                }
+            }
+            return null;
+        }
+
+        // ── Vuln Card Content (schema-driven: iterate field.columns) ─────
         function createVulnCardContent(vulnIndex, vulnData) {
             var content = document.createElement('div');
             content.className = 'dynamic-vuln-card-content';
 
-            // Row 0: vuln_system
-            var row0 = document.createElement('div');
-            row0.style.cssText = 'margin-bottom: 15px;';
-            var systemCol = getColumnConfig('vuln_system');
-            row0.appendChild(createVulnField(
-                (systemCol && systemCol.label) || '所属系统',
-                'text', vulnIndex, 'vuln_system', vulnData,
-                buildFieldOptions(systemCol, { placeholder: '如：门户网站、OA系统（用于"XX存在XX漏洞"标题）' })
-            ));
-            content.appendChild(row0);
+            if (field.columns && Array.isArray(field.columns)) {
+                field.columns.forEach(function(col) {
+                    var key = col.data_key || col.key;
 
-            // Row 1: vuln_level, vuln_location
-            var row1 = document.createElement('div');
-            row1.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;';
-            var levelCol = getColumnConfig('vuln_level');
-            row1.appendChild(createVulnField(
-                (levelCol && levelCol.label) || '漏洞级别',
-                'select', vulnIndex, 'vuln_level', vulnData,
-                buildFieldOptions(levelCol, { options: getRiskLevelOptions() })
-            ));
-            var locationCol = getColumnConfig('vuln_location');
-            row1.appendChild(createVulnField(
-                (locationCol && locationCol.label) || '漏洞位置',
-                'text', vulnIndex, 'vuln_location', vulnData,
-                buildFieldOptions(locationCol, { placeholder: '如：登录页面' })
-            ));
-            content.appendChild(row1);
+                    // widget_type == image_uploader: generic extra image uploader
+                    if (col.widget_type === 'image_uploader') {
+                        var previewSuffix = key + '_preview';
+                        var row = document.createElement('div');
+                        row.style.cssText = 'margin-bottom: 15px;';
+                        row.appendChild(createVulnImageUploader(vulnIndex, vulnData, key, col.label || '', previewSuffix));
+                        content.appendChild(row);
+                        return;
+                    }
 
-            // Row 1.5: vuln_url (textarea)
-            var row1b = document.createElement('div');
-            row1b.style.cssText = 'margin-bottom: 15px;';
-            var urlCol = getColumnConfig('vuln_url');
-            row1b.appendChild(createVulnField(
-                (urlCol && urlCol.label) || 'URL/IP',
-                'textarea', vulnIndex, 'vuln_url', vulnData,
-                buildFieldOptions(urlCol, { rows: 2, placeholder: '漏洞所在URL或IP，多个地址请换行输入' })
-            ));
-            content.appendChild(row1b);
+                    // type == image_list: vuln_evidence uploader
+                    if (col.type === 'image_list') {
+                        var rowEv = document.createElement('div');
+                        rowEv.style.cssText = 'margin-bottom: 15px;';
+                        rowEv.appendChild(createVulnEvidenceUploader(vulnIndex, vulnData));
+                        content.appendChild(rowEv);
+                        return;
+                    }
 
-            // Row 2: vuln_description
-            var row2 = document.createElement('div');
-            row2.style.cssText = 'margin-bottom: 15px;';
-            var descCol = getColumnConfig('vuln_description');
-            row2.appendChild(createVulnField(
-                (descCol && descCol.label) || '漏洞及风险描述',
-                'textarea', vulnIndex, 'vuln_description', vulnData,
-                buildFieldOptions(descCol, { rows: 3, placeholder: '漏洞详细描述' })
-            ));
-            content.appendChild(row2);
+                    // searchable_select: rendered in card header (vuln_name selector)
+                    if (col.type === 'searchable_select' || col.key === 'vuln_name') {
+                        return;
+                    }
 
-            // Row 3: vuln_evidence uploader
-            var row3 = document.createElement('div');
-            row3.style.cssText = 'margin-bottom: 15px;';
-            row3.appendChild(createVulnEvidenceUploader(vulnIndex, vulnData));
-            content.appendChild(row3);
+                    // Regular field
+                    var label = col.label || key;
+                    var displayType;
+                    if (col.type === 'select') {
+                        displayType = 'select';
+                    } else if (col.type === 'textarea') {
+                        displayType = 'textarea';
+                    } else {
+                        displayType = 'text';
+                    }
 
-            // Row 4: vuln_suggestion
-            var row4 = document.createElement('div');
-            row4.style.cssText = 'margin-bottom: 15px;';
-            var suggestionCol = getColumnConfig('vuln_suggestion');
-            row4.appendChild(createVulnField(
-                (suggestionCol && suggestionCol.label) || '修复建议',
-                'textarea', vulnIndex, 'vuln_suggestion', vulnData,
-                buildFieldOptions(suggestionCol, { rows: 3, placeholder: '修复方案' })
-            ));
-            content.appendChild(row4);
+                    var row = document.createElement('div');
+                    row.style.cssText = 'margin-bottom: 15px;';
+                    row.appendChild(createVulnField(label, displayType, vulnIndex, key, vulnData, col));
+                    content.appendChild(row);
+                });
+            } else {
+                // ── Fallback: hardcoded layout (backward compat) ──────────
+                var row0 = document.createElement('div');
+                row0.style.cssText = 'margin-bottom: 15px;';
+                var systemCol = getColumnConfig('vuln_system');
+                row0.appendChild(createVulnField(
+                    (systemCol && systemCol.label) || '所属系统',
+                    'text', vulnIndex, 'vuln_system', vulnData,
+                    buildFieldOptions(systemCol, { placeholder: '如：门户网站、OA系统（用于"XX存在XX漏洞"标题）' })
+                ));
+                content.appendChild(row0);
 
-            // Row 5: vuln_reference
-            var row5 = document.createElement('div');
-            var refCol = getColumnConfig('vuln_reference');
-            row5.appendChild(createVulnField(
-                (refCol && refCol.label) || '参考链接',
-                'text', vulnIndex, 'vuln_reference', vulnData,
-                buildFieldOptions(refCol, { placeholder: '可选' })
-            ));
-            content.appendChild(row5);
+                var row1 = document.createElement('div');
+                row1.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;';
+                var levelCol = getColumnConfig('vuln_level');
+                row1.appendChild(createVulnField(
+                    (levelCol && levelCol.label) || '漏洞级别',
+                    'select', vulnIndex, 'vuln_level', vulnData,
+                    buildFieldOptions(levelCol, { options: getRiskLevelOptions() })
+                ));
+                var locationCol = getColumnConfig('vuln_location');
+                row1.appendChild(createVulnField(
+                    (locationCol && locationCol.label) || '漏洞位置',
+                    'text', vulnIndex, 'vuln_location', vulnData,
+                    buildFieldOptions(locationCol, { placeholder: '如：登录页面' })
+                ));
+                content.appendChild(row1);
+
+                var row1b = document.createElement('div');
+                row1b.style.cssText = 'margin-bottom: 15px;';
+                var urlCol = getColumnConfig('vuln_url');
+                row1b.appendChild(createVulnField(
+                    (urlCol && urlCol.label) || 'URL/IP',
+                    'textarea', vulnIndex, 'vuln_url', vulnData,
+                    buildFieldOptions(urlCol, { rows: 2, placeholder: '漏洞所在URL或IP，多个地址请换行输入' })
+                ));
+                content.appendChild(row1b);
+
+                var row2 = document.createElement('div');
+                row2.style.cssText = 'margin-bottom: 15px;';
+                var descCol = getColumnConfig('vuln_description');
+                row2.appendChild(createVulnField(
+                    (descCol && descCol.label) || '漏洞及风险描述',
+                    'textarea', vulnIndex, 'vuln_description', vulnData,
+                    buildFieldOptions(descCol, { rows: 3, placeholder: '漏洞详细描述' })
+                ));
+                content.appendChild(row2);
+
+                var row3 = document.createElement('div');
+                row3.style.cssText = 'margin-bottom: 15px;';
+                row3.appendChild(createVulnEvidenceUploader(vulnIndex, vulnData));
+                content.appendChild(row3);
+
+                var row4 = document.createElement('div');
+                row4.style.cssText = 'margin-bottom: 15px;';
+                var suggestionCol = getColumnConfig('vuln_suggestion');
+                row4.appendChild(createVulnField(
+                    (suggestionCol && suggestionCol.label) || '修复建议',
+                    'textarea', vulnIndex, 'vuln_suggestion', vulnData,
+                    buildFieldOptions(suggestionCol, { rows: 3, placeholder: '修复方案' })
+                ));
+                content.appendChild(row4);
+
+                var row5 = document.createElement('div');
+                var refCol = getColumnConfig('vuln_reference');
+                row5.appendChild(createVulnField(
+                    (refCol && refCol.label) || '参考链接',
+                    'text', vulnIndex, 'vuln_reference', vulnData,
+                    buildFieldOptions(refCol, { placeholder: '可选' })
+                ));
+                content.appendChild(row5);
+            }
 
             return content;
         }
@@ -193,8 +254,9 @@
                     var badge = card.querySelector('.dynamic-vuln-index-badge');
                     if (badge) badge.textContent = '漏洞 ' + (idx + 1);
 
-                    var inputs = card.querySelectorAll('input, select, textarea, div[id*="_evidence_preview"]');
-                    inputs.forEach(function(el) {
+                    // Reindex all elements with field.id pattern (handles input, select, textarea, and preview divs)
+                    var elements = card.querySelectorAll('[id^="' + field.key + '_"]');
+                    elements.forEach(function(el) {
                         if (el.id) {
                             var prefixRegex = new RegExp('^' + field.key + '_\\d+_');
                             if (prefixRegex.test(el.id)) {
@@ -207,8 +269,8 @@
         }
 
         // ── Create Vuln Field ───────────────────────────────────────────
-        function createVulnField(label, type, vulnIndex, key, vulnData, options) {
-            options = options || {};
+        function createVulnField(label, type, vulnIndex, key, vulnData, column, fallbackOptions) {
+            var opts = buildFieldOptions(column, fallbackOptions);
             var wrapper = document.createElement('div');
             var labelEl = document.createElement('label');
             labelEl.textContent = label;
@@ -221,8 +283,13 @@
             if (type === 'select') {
                 input = document.createElement('select');
                 input.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;';
-                if (options.options) {
-                    options.options.forEach(function(opt) {
+
+                // Resolve options: column.source > column.options > fallback.options
+                var resolvedOpts = resolveSelectOptions(column);
+                var selectOptions = resolvedOpts || opts.options || getRiskLevelOptions();
+
+                if (selectOptions) {
+                    selectOptions.forEach(function(opt) {
                         var option = document.createElement('option');
                         option.value = opt.value;
                         option.textContent = opt.label;
@@ -236,8 +303,8 @@
                 });
             } else if (type === 'textarea') {
                 input = document.createElement('textarea');
-                input.rows = options.rows || 3;
-                input.placeholder = options.placeholder || '';
+                input.rows = opts.rows || 3;
+                input.placeholder = opts.placeholder || '';
                 input.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: vertical;';
                 input.value = vulnData[key] || '';
                 input.addEventListener('input', function(e) {
@@ -247,10 +314,13 @@
             } else {
                 input = document.createElement('input');
                 input.type = 'text';
-                input.placeholder = options.placeholder || '';
+                input.placeholder = opts.placeholder || '';
                 input.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;';
                 input.value = vulnData[key] || '';
-                input.addEventListener('input', function(e) { vulnData[key] = e.target.value; });
+                input.addEventListener('input', function(e) {
+                    vulnData[key] = e.target.value;
+                    notifyDataChanged();
+                });
             }
 
             input.id = fieldId;
@@ -354,36 +424,158 @@
             var evidenceObj = { path: imageInfo.file_path, description: '' };
             vulnData.vuln_evidence.push(evidenceObj);
 
-            textarea.addEventListener('input', function(e) { evidenceObj.description = e.target.value; });
+            textarea.addEventListener('input', function(e) { evidenceObj.description = e.target.value; notifyDataChanged(); });
             delBtn.onclick = function() {
                 wrapper.remove();
                 var idx = vulnData.vuln_evidence.indexOf(evidenceObj);
                 if (idx > -1) vulnData.vuln_evidence.splice(idx, 1);
+                notifyDataChanged();
             };
 
             container.appendChild(wrapper);
+            notifyDataChanged();
+        }
+
+        // ── Create Vuln Image Uploader (generic, for image_uploader widget_type) ──
+        function createVulnImageUploader(vulnIndex, vulnData, key, label, previewSuffix) {
+            var wrapper = document.createElement('div');
+
+            var labelRow = document.createElement('div');
+            labelRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;';
+
+            var labelEl = document.createElement('label');
+            labelEl.textContent = label || '截图';
+            labelEl.style.cssText = 'font-weight: 500;';
+            labelRow.appendChild(labelEl);
+
+            var pasteBtn = document.createElement('button');
+            pasteBtn.type = 'button';
+            pasteBtn.className = 'btn-mini';
+            pasteBtn.textContent = '粘贴截图';
+            labelRow.appendChild(pasteBtn);
+            wrapper.appendChild(labelRow);
+
+            var uploadArea = document.createElement('div');
+            uploadArea.style.cssText = 'border: 2px dashed #ddd; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; background: #fff;';
+            uploadArea.innerHTML = '<span style="color: #999;">点击上传或拖拽图片</span>';
+            wrapper.appendChild(uploadArea);
+
+            var previewContainer = document.createElement('div');
+            previewContainer.id = field.key + '_' + vulnIndex + '_' + previewSuffix;
+            previewContainer.style.cssText = 'margin-top: 10px;';
+            wrapper.appendChild(previewContainer);
+
+            if (!vulnData[key]) vulnData[key] = [];
+
+            uploadArea.onclick = function() {
+                var inputEl = document.createElement('input');
+                inputEl.type = 'file';
+                inputEl.accept = 'image/*';
+                inputEl.multiple = true;
+                inputEl.onchange = async function(e) {
+                    var files = e.target.files;
+                    for (var i = 0; i < files.length; i++) {
+                        var result = await callbacks.uploadImage(files[i]);
+                        if (result) addVulnImageUploaderItem(vulnData, key, result, previewContainer, label);
+                    }
+                };
+                inputEl.click();
+            };
+
+            pasteBtn.onclick = async function(e) {
+                e.preventDefault();
+                try {
+                    var items = await navigator.clipboard.read();
+                    for (var i = 0; i < items.length; i++) {
+                        var item = items[i];
+                        var imgType = item.types.find(function(t) { return t.startsWith('image/'); });
+                        if (imgType) {
+                            var blob = await item.getType(imgType);
+                            var result = await callbacks.uploadImage(blob);
+                            if (result) addVulnImageUploaderItem(vulnData, key, result, previewContainer, label);
+                        }
+                    }
+                } catch (err) {
+                    callbacks.toast && callbacks.toast("无法读取剪贴板");
+                }
+            };
+
+            return wrapper;
+        }
+
+        // ── Add Vuln Image Uploader Item (generic) ──────────────────────
+        function addVulnImageUploaderItem(vulnData, key, imageInfo, container, label) {
+            var baseUrl = callbacks.getConfig('BASE_URL') || '';
+            var fullUrl = baseUrl + imageInfo.url;
+
+            var wrapper = document.createElement('div');
+            wrapper.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; padding: 10px; background: #f9f9f9; border: 1px solid #eee; border-radius: 4px;';
+
+            var img = document.createElement('img');
+            img.src = fullUrl;
+            img.style.cssText = 'max-width: 150px; max-height: 100px; border: 1px solid #ccc; cursor: zoom-in;';
+            img.onclick = function() { callbacks.openImagePreview && callbacks.openImagePreview(fullUrl, label || '截图'); };
+            wrapper.appendChild(img);
+
+            var textarea = document.createElement('textarea');
+            textarea.rows = 2;
+            textarea.placeholder = '截图说明';
+            textarea.style.cssText = 'flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px;';
+            wrapper.appendChild(textarea);
+
+            var delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.textContent = '删除';
+            delBtn.style.cssText = 'background: #ff4d4f; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;';
+            wrapper.appendChild(delBtn);
+
+            var itemObj = { path: imageInfo.file_path, description: '' };
+            vulnData[key].push(itemObj);
+
+            textarea.addEventListener('input', function(e) { itemObj.description = e.target.value; notifyDataChanged(); });
+            delBtn.onclick = function() {
+                wrapper.remove();
+                var idx = vulnData[key].indexOf(itemObj);
+                if (idx > -1) vulnData[key].splice(idx, 1);
+                notifyDataChanged();
+            };
+
+            container.appendChild(wrapper);
+            notifyDataChanged();
         }
 
         // ── Fill Vuln Item From Library ─────────────────────────────────
         function fillVulnItemFromLibrary(vulnIndex, vulnData, libraryData) {
-            vulnData.vuln_name = libraryData.Vuln_Name || libraryData.name || '';
-            vulnData.vuln_level = libraryData.Risk_Level || libraryData.level || '中危';
-            vulnData.vuln_description = libraryData.Vuln_Description || libraryData.description || '';
-            vulnData.vuln_suggestion = libraryData.Repair_suggestions || libraryData.suggestion || '';
+            var mappings = field.vuln_fill || [
+                { from: 'Vuln_Name', to: 'vuln_name' },
+                { from: 'Risk_Level', to: 'vuln_level', default: '中危' },
+                { from: 'Vuln_Description', to: 'vuln_description' },
+                { from: 'Repair_suggestions', to: 'vuln_suggestion' }
+            ];
 
-            var prefix = field.key + '_' + vulnIndex;
+            mappings.forEach(function(m) {
+                vulnData[m.to] = libraryData[m.from] || m.default || '';
+            });
 
-            var levelSelect = document.getElementById(prefix + '_vuln_level');
-            if (levelSelect) {
-                levelSelect.value = vulnData.vuln_level;
-                levelSelect.dispatchEvent(new Event('change'));
+            // Optional: append hazards to description
+            if (field.vuln_fill_append_hazards && libraryData.Vuln_Hazards) {
+                vulnData.vuln_description = (vulnData.vuln_description || '') + '\n\n【漏洞危害】\n' + libraryData.Vuln_Hazards;
             }
 
-            var descTextarea = document.getElementById(prefix + '_vuln_description');
-            if (descTextarea) descTextarea.value = vulnData.vuln_description;
+            // Update DOM fields
+            var prefix = field.key + '_' + vulnIndex;
 
-            var suggTextarea = document.getElementById(prefix + '_vuln_suggestion');
-            if (suggTextarea) suggTextarea.value = vulnData.vuln_suggestion;
+            mappings.forEach(function(m) {
+                var el = document.getElementById(prefix + '_' + m.to);
+                if (el) {
+                    if (el.tagName === 'SELECT') {
+                        el.value = vulnData[m.to];
+                        el.dispatchEvent(new Event('change'));
+                    } else {
+                        el.value = vulnData[m.to];
+                    }
+                }
+            });
 
             updateVulnSidebarItem(vulnIndex, vulnData);
 
@@ -590,7 +782,7 @@
             sidebarList.appendChild(item);
         }
 
-        // ── Add Vuln Item ───────────────────────────────────────────────
+        // ── Add Vuln Item (schema-driven defaults) ───────────────────────
         function addVulnItem() {
             var listWrapper = document.getElementById(field.key + '_list');
             var sidebarList = document.getElementById(field.key + '_sidebar_list');
@@ -600,17 +792,36 @@
             if (emptyTip) emptyTip.style.display = 'none';
 
             var vulnIndex = dataArray.length;
-            var vulnData = {
-                vuln_system: '',
-                vuln_name: '',
-                vuln_level: '中危',
-                vuln_url: '',
-                vuln_location: '',
-                vuln_description: '',
-                vuln_evidence: [],
-                vuln_suggestion: '',
-                vuln_reference: ''
-            };
+            var vulnData = {};
+
+            // Schema-driven defaults: build from field.columns
+            if (field.columns && Array.isArray(field.columns)) {
+                field.columns.forEach(function(col) {
+                    var key = col.data_key || col.key;
+                    var defaultVal = col.default || '';
+                    if (col.type === 'image_uploader' || col.type === 'image_list' || col.widget_type === 'image_uploader') {
+                        vulnData[key] = [];
+                    } else {
+                        vulnData[key] = defaultVal;
+                    }
+                });
+            }
+
+            // Fallback: if no columns declared, use hardcoded defaults
+            if (Object.keys(vulnData).length === 0) {
+                vulnData = {
+                    vuln_system: '',
+                    vuln_name: '',
+                    vuln_level: '中危',
+                    vuln_url: '',
+                    vuln_location: '',
+                    vuln_description: '',
+                    vuln_evidence: [],
+                    vuln_suggestion: '',
+                    vuln_reference: ''
+                };
+            }
+
             dataArray.push(vulnData);
 
             addVulnSidebarItem(vulnIndex, vulnData, sidebarList);

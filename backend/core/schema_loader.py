@@ -36,7 +36,7 @@ class SchemaLoader:
         Read schema.yaml from template_dir, parse to TemplateInfo (Pydantic model).
 
         Args:
-            template_dir: Absolute path to template directory (e.g. backend/templates/vuln_report)
+            template_dir: Absolute path to template directory (e.g. backend/templates/my_template)
 
         Returns:
             TemplateInfo Pydantic model with all fields, groups, behaviors, etc.
