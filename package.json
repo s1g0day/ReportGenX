@@ -52,6 +52,10 @@
         "to": "backend/templates"
       },
       {
+        "from": "backend/widgets",
+        "to": "backend/widgets"
+      },
+      {
         "from": "backend/data",
         "to": "backend/data"
       }

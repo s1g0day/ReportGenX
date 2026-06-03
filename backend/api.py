@@ -1747,7 +1747,7 @@ def get_template_widget(template_id: str, filename: str):
 @app.get("/api/widgets/shared/{filename}")
 def get_shared_widget(filename: str):
     """Serve shared widget files (JS / CSS) from the common widgets directory."""
-    shared_dir = os.path.join(os.path.dirname(__file__), "widgets")
+    shared_dir = os.path.join(BASE_DIR, "widgets")
     widget_path = os.path.join(shared_dir, filename)
     if ".." in filename or not os.path.exists(widget_path):
         raise HTTPException(status_code=404, detail="Shared widget not found")
