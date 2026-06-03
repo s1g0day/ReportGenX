@@ -9,6 +9,7 @@ const log = require('electron-log')
 let pythonProcess = null
 let mainWindow = null
 let isQuitting = false
+app.setName('ReportGenX')
 const APP_API_TOKEN = crypto.randomBytes(24).toString('hex')
 
 const sharedConfig = loadSharedConfig(app, __dirname)
