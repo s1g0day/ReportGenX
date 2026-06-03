@@ -36,6 +36,7 @@
 │  ├─ core/
 │  ├─ plugin_host/
 │  ├─ templates/
+│  ├─ widgets/
 │  ├─ tests/
 │  └─ data/
 ├─ src/
@@ -64,6 +65,7 @@
 │  └─ e2e-smoke.js
 ├─ main.js
 ├─ preload.js
+├─ update.md
 └─ package.json
 ```
 

@@ -1,8 +1,8 @@
 # PROJECT_OVERVIEW
 
 > 面向接手开发者的快速上下文文档
-> 更新时间：2026-05-30
-> 当前版本：0.20.2
+> 更新时间：2026-06-04
+> 当前版本：0.21.1
 
 ## 1. 项目定位
 
@@ -123,6 +123,8 @@ backend/templates/<template_id>/
 └── widgets/           # 可选：自定义 JS/CSS 组件
 ```
 
+模板级 Widget 位于模板的 `widgets/` 子目录，项目级共享 Widget 位于 `backend/widgets/`（当前包含通用 `vuln_list.js` 漏洞列表组件，合并了 4 个模板的近似代码）。
+
 ### 架构模式
 
 当前标准：**PLUGIN descriptor + GenerationContext**（不再使用 `BaseTemplateHandler` 类继承）。
@@ -150,7 +152,7 @@ def generate(data, ctx):  # ctx = GenerationContext — 提供所有框架服务
 | `penetration_test` | 渗透测试报告 | 完整渗透测试报告，含漏洞表/风险图/目录 |
 | `Attack_Defense` | 攻防演练报告 | 攻防演练，含服务器类型/DB 连接/数据统计 |
 | `single_vuln_report` | 单个漏洞报告 | 最简模板，从漏洞库快速选取填充 |
-| `intranet_vuln` | 内网渗透测试报告 | 内网漏洞渗透测试报告，含渗透入口、互联网/内网渗透路径、数据汇总 |
+| `intranet_vuln` | 内网测试报告 | 内网漏洞测试报告，含渗透入口、互联网/内网渗透路径、数据汇总 |
 
 ---
 

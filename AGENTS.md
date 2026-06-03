@@ -62,7 +62,8 @@ npm run sync-version    # Syncs version from package.json to backend/shared-conf
 │   │       ├── schema.yaml # Form definition
 │   │       ├── handler.py  # Business logic
 │   │       └── template.docx
-│   │   # Current templates: vuln_report, intrusion_report, penetration_test, Attack_Defense, single_vuln_report, intranet_vuln
+│   │   # Current templates: vuln_report, intrusion_report, penetration_test, Attack_Defense, single_vuln_report, intranet_vuln (内网测试报告)
+│   ├── widgets/             # Shared widget directory (vuln_list.js + style.css)
 │   └── data/               # SQLite database
 ├── src/                    # Frontend source
 │   ├── index.html

@@ -5,7 +5,7 @@
 id: intrusion_report
 name: 入侵痕迹报告
 description: 用于记录和报告系统入侵痕迹的分析报告模板
-version: "1.0.0"
+version: "0.21.1"
 order: 2
 icon: ""
 author: ReportGenX Team

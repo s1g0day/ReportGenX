@@ -1,7 +1,7 @@
 # 部署与运维指南
 
-> 更新日期：2026-05-30
-> 适用版本：0.20.2
+> 更新日期：2026-06-04
+> 适用版本：0.21.1
 
 ## 1. 部署模式
 
@@ -109,9 +109,43 @@ ReportGenX/
 │   ├── config.yaml         # 业务配置
 │   ├── shared-config.json  # 运行时共享配置
 │   ├── templates/          # 模板目录
+│   ├── widgets/            # 共享 Widget 目录
 │   └── data/               # SQLite 数据库
 └── ...
 ```
+
+### 4.5 extraResources 配置
+
+打包时通过 `extraResources` 将运行时必需目录复制到应用资源中：
+
+```json
+// package.json → build.extraResources
+[
+  { "from": "backend/dist",      "to": "backend/dist" },
+  { "from": "backend/config.yaml", "to": "backend/config.yaml" },
+  { "from": "backend/shared-config.json", "to": "backend/shared-config.json" },
+  { "from": "backend/templates", "to": "backend/templates" },
+  { "from": "backend/widgets",   "to": "backend/widgets" },
+  { "from": "backend/data",      "to": "backend/data" }
+]
+```
+
+- `backend/templates`、`backend/widgets`、`backend/data` 在打包时随应用发布
+- 首次运行后，应用将 `data`、`templates`、`widgets` 复制到系统 AppData 用户目录，后续优先读取 AppData 中的副本，支持运行时自定义和数据持久化
+
+### 4.6 NSIS 安装器数据保留
+
+Windows 安装器配置中使用 `deleteAppDataOnUninstall: false` 保留卸载时的用户数据：
+
+```json
+// package.json → build.nsis
+{
+  "deleteAppDataOnUninstall": false,
+  "include": "build/installer.nsh"
+}
+```
+
+卸载应用时不会删除 `AppData` 中的数据库、模板等用户数据，重新安装后自动恢复。
 
 ---
 

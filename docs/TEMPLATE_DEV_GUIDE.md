@@ -1,7 +1,7 @@
 # 模板开发完整指南
 
 > ReportGenX 模板系统开发文档
-> 版本: 2.0.0 | 更新日期: 2026-05-30 | 适用版本: 0.20.2
+> 版本: 2.0.0 | 更新日期: 2026-06-04 | 适用版本: 0.21.1
 
 ---
 
@@ -166,7 +166,7 @@ def execute(data, output_dir, template_manager, config, template_id="my_template
     from backend.core.logger import setup_logger
     from backend.core.schema_loader import SchemaLoader
 
-    template_dir = os.path.join(template_manager.templates_dir, template_id)
+    template_dir = template_manager.get_template_dir(template_id)
     template_info = SchemaLoader.load_schema(template_dir)
     runtime_cfg = SchemaLoader.load_runtime(template_dir)
 
@@ -454,6 +454,56 @@ options:
 | `config` | 从 config.yaml 读取 | `config_key` |
 | `api` | 调用外部 API | `endpoint` |
 
+### 漏洞库保存配置 (`vuln_save`)
+
+当模板包含漏洞表单字段时，可声明 `vuln_save` 映射，自动将生成报告中的漏洞数据写入漏洞库：
+
+```yaml
+vuln_save:
+  name_field: vuln_name          # 漏洞名称字段 key（用于去重判断）
+  mapping:
+    name: vuln_name              # 漏洞库列 → 表单字段 key
+    description: description
+    suggestion: repair_suggestion
+    level: hazard_level
+```
+
+- `name_field` 指定漏洞名称对应的表单字段，用于判断是否已存在同名漏洞
+- `mapping` 中键为漏洞库列名，值为表单字段 key
+- 不声明 `vuln_save` 则跳过自动入库
+- 参考：`backend/templates/single_vuln_report/schema.yaml`、`backend/templates/vuln_report/schema.yaml`
+
+### 字段联动 (`dependent_fields`)
+
+声明字段之间的联动关系，支持模板字符串、自动生成和预计算：
+
+```yaml
+dependent_fields:
+  # 简单模板替换 — 当一个字段变化时，自动填充另一个字段
+  entry_text:
+    trigger_field: target_name
+    template: "通过前期信息收集，查询${target_name}备案域名..."
+
+  # 自动生成 + 预计算
+  report_conclusion:
+    trigger_fields: [internet_vulns, intranet_vulns, controlled_servers]
+    auto_generate: true
+    computed_template: "${target_name}存在有效高危漏洞${_effective_high_vulns}个..."
+    pre_compute:
+      count_vulns:
+        source: [internet_vulns, intranet_vulns]
+        level_field: vuln_level
+      output:
+        _effective_high_vulns: count_high_critical_vulns
+```
+
+- `trigger_field` / `trigger_fields`：联动触发源字段
+- `template`：使用 `${fieldKey}` 引用表单字段值
+- `auto_generate: true`：字段值变化时自动重新计算
+- `pre_compute`：在模板替换前执行预计算（如统计、聚合），结果注入到 `computed_template` 的变量上下文
+- `output`：预计算结果变量名映射（`_` 前缀变量为内部变量）
+- 参考：`backend/templates/intranet_vuln/schema.yaml`、`backend/templates/Attack_Defense/schema.yaml`
+
 ---
 
 ## 5. runtime.yaml 参考
@@ -533,7 +583,22 @@ fields:
 
 ### Widget 文件服务
 
-前端通过 `GET /api/templates/{template_id}/widgets/vuln_list.js` 加载 widget 代码。
+模板级 Widget 通过 `GET /api/templates/{template_id}/widgets/<file>` 加载。
+
+### 共享 Widget（`backend/widgets/`）
+
+项目级别共享 Widget 目录 `backend/widgets/` 存放跨模板复用的通用组件，当前包含：
+
+```
+backend/widgets/
+├── vuln_list.js    # 通用漏洞列表 Widget（~45KB, schema-driven）
+└── style.css       # 共享样式
+```
+
+- 共享 Widget 同样通过 `window.__widgetFactories` 注册
+- Schema 中 `widget_file` 查找顺序：先查模板的 `widgets/` 目录，再查 `backend/widgets/`
+- `vuln_list.js` 合并了 4 个模板中近似的漏洞列表代码为单一共享实现
+- 共享 Widget 在打包时通过 `extraResources` 包含到应用目录
 
 ---
 
@@ -620,6 +685,6 @@ from core import (
 | `penetration_test` | 渗透测试报告 | ~30+ | 高 | `backend/templates/penetration_test/` |
 | `Attack_Defense` | 攻防演练报告 | ~40+ | 高 | `backend/templates/Attack_Defense/` |
 | `single_vuln_report` | 单个漏洞报告 | ~10 | 低 | `backend/templates/single_vuln_report/` |
-| `intranet_vuln` | 内网渗透测试报告 | ~40+ | 高 | `backend/templates/intranet_vuln/` |
+| `intranet_vuln` | 内网测试报告 | ~40+ | 高 | `backend/templates/intranet_vuln/` |
 
 推荐从 `single_vuln_report` 开始阅读 — 代码最简洁、模式最清晰。
