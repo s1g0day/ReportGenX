@@ -9,7 +9,7 @@
 id: vuln_report
 name: 风险隐患报告
 description: 用于生成网络安全风险隐患报告，适用于漏洞通报、安全检查等场景
-version: "0.21.1"
+version: "0.21.2"
 order: 1
 template_file: template.docx
 icon: ""
