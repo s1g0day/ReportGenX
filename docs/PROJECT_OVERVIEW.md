@@ -33,7 +33,7 @@
 
 ### 后端
 
-- FastAPI：`backend/api.py`（~2174 行，单文件全量 API）
+- FastAPI：`backend/api.py`（~2305 行，单文件全量 API）
 - 核心逻辑：`backend/core/*`
 - SDK 门面：`core/__init__.py`（从 backend.core.* 重导出）
 - 插件运行时：`backend/plugin_host/runtime.py`
@@ -54,7 +54,7 @@
 - `src/js/crud-manager.js`：通用 CRUD 抽象
 - `backend/api.py`：API 入口、中间件、路由
 - `backend/core/template_manager.py`：模板扫描与依赖检查（含安全审计）
-- `backend/core/generation_context.py`：模板服务注入层（~947 行）
+- `backend/core/generation_context.py`：模板服务注入层（~966 行）
 - `backend/core/schema_loader.py`：YAML → Pydantic 解析
 - `backend/shared-config.json`：server/security/paths/plugin_runtime 共享配置
 
@@ -123,7 +123,7 @@ backend/templates/<template_id>/
 └── widgets/           # 可选：自定义 JS/CSS 组件
 ```
 
-模板级 Widget 位于模板的 `widgets/` 子目录，项目级共享 Widget 位于 `backend/widgets/`（当前包含通用 `vuln_list.js` 漏洞列表组件，合并了 4 个模板的近似代码）。
+模板级 Widget 位于模板的 `widgets/` 子目录，项目级共享 Widget 位于 `backend/widgets/`（当前包含通用 `vuln_list.js` 漏洞列表组件，合并了 4 个模板的近似代码）。支持 `pre_compute` 预计算：在联动字段替换前自动执行统计/聚合，结果注入模板变量上下文。
 
 ### 架构模式
 

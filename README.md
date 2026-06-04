@@ -2,7 +2,7 @@
 
 一个用于生成安全报告的桌面应用，采用 **Electron 前端壳 + 本地 FastAPI 后端 + 模板插件系统**。
 
-> 当前归档版本：`0.21.1`
+> 当前归档版本：`0.21.2`
 
 ## 核心能力
 
@@ -44,10 +44,12 @@
 │  ├─ styles.css
 │  └─ js/
 │     ├─ api.js
+│     ├─ config.js
 │     ├─ main.js
 │     ├─ form-renderer.js
 │     ├─ form-renderer-fields.js
 │     ├─ form-renderer-images.js
+│     ├─ utils.js
 │     ├─ toolbox.js
 │     ├─ template-manager.js
 │     ├─ vuln-manager.js
@@ -57,8 +59,7 @@
 │  ├─ PROJECT_OVERVIEW.md
 │  ├─ DEPLOYMENT_GUIDE.md
 │  ├─ RUNTIME_OPERATIONS_RUNBOOK.md
-│  ├─ TEMPLATE_DEV_GUIDE.md
-│  └─ TEMPLATE_QUICK_START.md
+│  └─ TEMPLATE_DEV_GUIDE.md
 ├─ scripts/
 │  ├─ sync-version.js
 │  ├─ check-version-sync.js
@@ -159,4 +160,3 @@ npm run check-version
 - 部署指南：`docs/DEPLOYMENT_GUIDE.md`
 - 运行手册：`docs/RUNTIME_OPERATIONS_RUNBOOK.md`
 - 模板开发：`docs/TEMPLATE_DEV_GUIDE.md`
-- 模板快速入门：`docs/TEMPLATE_QUICK_START.md`

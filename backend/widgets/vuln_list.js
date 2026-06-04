@@ -16,6 +16,62 @@
         // ── Clean: notify framework of data changes ──────────────────────
         function notifyDataChanged() {
             callbacks.setData(dataArray);
+            // Auto-count vulns by risk level if count_levels config exists
+            if (field.count_levels) {
+                updateVulnCounts();
+            }
+        }
+
+        function updateVulnCounts() {
+            var cfg = field.count_levels;
+            if (!cfg || !cfg.output) return;
+            var levelField = cfg.level_field || 'vuln_level';
+            var urlField = cfg.url_field || 'vuln_url';
+            var counts = {};
+            dataArray.forEach(function(v) {
+                var level = v[levelField] || '中危';
+                var urlLines = (v[urlField] || '').split('\n').filter(function(l) { return l.trim(); }).length;
+                counts[level] = (counts[level] || 0) + Math.max(1, urlLines);
+            });
+            var total = 0;
+            for (var level in cfg.output) {
+                var targetKey = cfg.output[level];
+                var count = counts[level] || 0;
+                callbacks.setFormValue(targetKey, String(count));
+                total += count;
+            }
+            if (cfg.total) {
+                callbacks.setFormValue(cfg.total, String(total));
+            }
+            if (cfg.summary_field) {
+                // Build detailed summary: group by vuln_name, list affected systems.
+                // Format: "1) systemA存在SQL注入\n2) systemB、systemC等存在未授权访问"
+                var vulnGroups = {};
+                dataArray.forEach(function(v) {
+                    var vname = (v.vuln_name || '').trim();
+                    if (!vname) return;
+                    if (!vulnGroups[vname]) vulnGroups[vname] = [];
+                    var sys = (v.vuln_system || '').trim();
+                    if (sys && vulnGroups[vname].indexOf(sys) === -1)
+                        vulnGroups[vname].push(sys);
+                });
+                var lines = [], idx = 1;
+                for (var vname in vulnGroups) {
+                    var systems = vulnGroups[vname];
+                    var line = systems.length === 0 ? (idx + ') ' + vname)
+                             : systems.length === 1 ? (idx + ') ' + systems[0] + '存在' + vname)
+                             : (idx + ') ' + systems.join('、') + '等存在' + vname);
+                    lines.push(line); idx++;
+                }
+                callbacks.setFormValue(cfg.summary_field,
+                    lines.length > 0 ? lines.join('\n') : '');
+            }
+            // Issue 1 fix: trigger risk computation after counts are updated.
+            // The behavior system (compute_risk_level) depends on vuln_count_* fields;
+            // by calling triggerRiskCompute after all counts are set, we ensure
+            // overall_risk_level and its presets (risk_assessment, risk_suggestion,
+            // remediation_measures) are re-evaluated with fresh count values.
+            callbacks.triggerRiskCompute && callbacks.triggerRiskCompute();
         }
 
         // ── Helper: getColumnConfig ─────────────────────────────────────
@@ -891,6 +947,9 @@
             });
             selectVulnItem(0);
         }
+
+        // Trigger side effects for initial data (counts, conclusions, etc.)
+        notifyDataChanged();
 
         // ── Return widget API ───────────────────────────────────────────
         return {

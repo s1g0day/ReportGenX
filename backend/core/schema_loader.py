@@ -106,6 +106,7 @@ class SchemaLoader:
                     trigger_field=trigger.get("field", ""),
                     trigger_event=trigger.get("event", "change"),
                     actions=actions,
+                    trigger=trigger,  # preserve full trigger object (fields array etc.)
                 )
                 behaviors.append(behavior)
             except Exception as e:

@@ -1,25 +1,19 @@
 # Update Log
 
+## v0.21.2 (2026-06-04)
+
+- **文档同步**：修复 README.md / AGENTS.md 文件列表，更新架构分析和项目概览文档
+- **Widget 增强**：vuln_list 通过 `count_levels` 配置驱动漏洞统计（含 `notifyDataChanged` 初始化），`pre_compute` 联动预计算注入变量上下文，`has_widgets` 标记避免模板 404
+- **模板修复**：`vuln_url` 改为多行输入，移除废弃字段（`vuln_description`/`vuln_suggestion`/`vuln_reference`），内网渗透报告改进，Pydantic `extra=allow` 兼容旧模板
+
+---
+
 ## v0.21.1 (2026-06-03)
 
-### 数据持久化
-- **用户数据迁移到 OS 用户数据目录**：DB、报告、日志、配置从安装目录迁移到 `%APPDATA%/ReportGenX/`，重装不再丢失数据
-- 首次启动自动从安装包复制种子数据到 AppData
-
-### 安装器增强
-- **NSIS 数据保留提示**：安装/重装/卸载时询问是否保留已有数据
-- 修复 userData 目录名（`report-electron-app` → `ReportGenX`）
-
-### 模板系统
-- **修复用户导入模板无法使用**：handler 改用 `get_template_dir()` 双路径解析
-- **vuln_save 声明式映射**：模板在 schema.yaml 中声明字段→漏洞库映射
-- **合并 4 个 vuln_list.js 为共享 widget**：净减少 2227 行，schema `columns` 驱动渲染
-- **架构解耦**：form-renderer 中模板专属硬编码改为 schema 驱动
-
-### 模板改进
-- **内网测试报告**：新增报告总结自动生成、修复内网资产渗透路径插入失败
-- **单个漏洞报告**：新增网站域名字段、调整字段顺序
-- 修复 `in` 操作符 TypeError（24 处 `para.text/cell.text` None 防护）
+- **AppData 迁移**：DB、报告、日志、配置从安装目录迁移到 `%APPDATA%/ReportGenX/`，重装不再丢失数据
+- **NSIS 数据保留**：安装/重装/卸载时询问是否保留已有数据，修复 userData 目录名
+- **模板系统重构**：合并 4 个 vuln_list.js 为共享 widget（净减少 2227 行），schema 驱动渲染和声明式映射，解除 form-renderer 硬编码
+- **模板修复**：修复用户导入模板 handler 路径、`in` 操作符 TypeError（24 处 None 防护）、内网/单漏洞报告改进
 
 ---
 

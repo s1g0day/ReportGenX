@@ -35,7 +35,7 @@ ALLOWED_FIELD_TYPES = {
 ALLOWED_DATA_SOURCE_TYPES = {'database', 'config', 'api'}
 
 # 允许的行为动作类型
-ALLOWED_ACTION_TYPES = {'api_call', 'compute', 'set_value'}
+ALLOWED_ACTION_TYPES = {'api_call', 'compute', 'set_value', 'risk_compute', 'trigger_behavior'}
 
 
 # =============================================================================
@@ -168,6 +168,7 @@ class DataSourceDef(BaseModel):
 
 class BehaviorAction(BaseModel):
     """行为动作"""
+    model_config = {"extra": "allow"}
     type: str
     endpoint: str = ""
     params: Dict[str, Any] = Field(default_factory=dict)
@@ -186,6 +187,7 @@ class BehaviorAction(BaseModel):
 
 class Behavior(BaseModel):
     """行为定义"""
+    model_config = {"extra": "allow"}
     id: str
     trigger_field: str = ""
     trigger_event: str = "change"
@@ -207,6 +209,7 @@ class PreviewField(BaseModel):
 
 class TemplateInfo(BaseModel):
     """模板信息"""
+    model_config = {"extra": "allow"}
     id: str
     name: str
     description: str = ""

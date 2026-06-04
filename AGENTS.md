@@ -72,6 +72,8 @@ npm run sync-version    # Syncs version from package.json to backend/shared-conf
 │       ├── api.js          # API client (window.AppAPI)
 │       ├── config.js       # Configuration module
 │       ├── form-renderer.js # Dynamic form generator
+│       ├── form-renderer-fields.js # Field type handlers
+│       ├── form-renderer-images.js # Image processing
 │       ├── main.js         # App entry point
 │       ├── template-manager.js # Template management
 │       ├── toolbox.js      # Toolbox utilities

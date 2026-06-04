@@ -24,6 +24,7 @@ desktop.ini
 # 忽略 IDE 配置
 .vscode/
 .idea/
+.omo/
 *.swp
 *.swo
 

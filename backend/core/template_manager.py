@@ -318,8 +318,10 @@ class TemplateManager:
         # 先按 order 排序模板
         sorted_templates = sorted(self._templates.values(), key=lambda t: t.order)
         
-        return [
-            {
+        result = []
+        for t in sorted_templates:
+            template_dir = self.get_template_dir(t.id)
+            result.append({
                 "id": t.id,
                 "name": t.name,
                 "description": t.description,
@@ -327,10 +329,10 @@ class TemplateManager:
                 "version": t.version,
                 "author": t.author,
                 "update_time": t.update_time,
-                "order": t.order
-            }
-            for t in sorted_templates
-        ]
+                "order": t.order,
+                "has_widgets": os.path.isdir(os.path.join(template_dir, "widgets"))
+            })
+        return result
     
     def get_template_versions(self, template_id: str) -> List[str]:
         """获取模板的所有版本"""
@@ -445,16 +447,14 @@ class TemplateManager:
             behavior: 行为定义对象
             
         Returns:
-            行为字典
+             行为字典（含 trigger.fields 数组等额外字段）
         """
-        return {
-            "id": behavior.id,
-            "trigger": {
-                "field": behavior.trigger_field,
-                "event": behavior.trigger_event
-            },
-            "actions": [a.model_dump() for a in behavior.actions]
-        }
+        # Use model_dump() to preserve extra fields like trigger.fields
+        # that are not mapped to explicit Behavior model attributes
+        data = behavior.model_dump()
+        # Backward compat: actions use model_dump() which now includes extra fields
+        data["actions"] = [a.model_dump() for a in behavior.actions]
+        return data
     
     @lru_cache(maxsize=128)
     def _get_cached_schema(self, template_id: str, version: str) -> Optional[Dict[str, Any]]:
@@ -502,6 +502,7 @@ class TemplateManager:
 
         # Inject raw schema fields not captured by TemplateInfo (e.g. vuln_save)
         template_path = self.get_template_dir(template_id)
+        result["has_widgets"] = os.path.isdir(os.path.join(template_path, "widgets"))
         schema_path = os.path.join(template_path, "schema.yaml")
         if os.path.exists(schema_path):
             try:
@@ -941,6 +942,7 @@ class TemplateManager:
             "file_size_mb": round(total_size / 1024 / 1024, 2),
             "has_schema": os.path.exists(schema_path),
             "has_docx": os.path.exists(docx_path),
+            "has_widgets": os.path.isdir(os.path.join(template_path, "widgets")),
             "is_default": template.id == self.default_template_id
         }
     

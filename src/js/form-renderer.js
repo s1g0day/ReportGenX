@@ -837,15 +837,29 @@ window.AppFormRenderer = {
     // ── Template CSS loading ──────────────────────────────────────────
 
     // Dynamic CSS injection for template-specific styles
-    loadTemplateStyle(templateId) {
+    async loadTemplateStyle(templateId) {
         const baseUrl = window.AppAPI?.BASE_URL || '';
         const cssUrl = `${baseUrl}/api/templates/${templateId}/widgets/style.css`;
+        const sharedCssUrl = `${baseUrl}/api/widgets/shared/style.css`;
         // Remove previously injected template CSS
         document.querySelectorAll('link[data-template-css]').forEach(el => el.remove());
-        // Inject new template CSS
+        // Only probe template-local CSS if has_widgets is true
+        let finalUrl;
+        if (this.currentSchema?.has_widgets) {
+            finalUrl = cssUrl;
+            try {
+                const resp = await fetch(cssUrl);
+                if (!resp.ok) finalUrl = sharedCssUrl;
+            } catch (_e) {
+                finalUrl = sharedCssUrl;
+            }
+        } else {
+            finalUrl = sharedCssUrl;
+        }
+        // Inject CSS
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = cssUrl;
+        link.href = finalUrl;
         link.setAttribute('data-template-css', templateId);
         link.onerror = () => link.remove();
         document.head.appendChild(link);
@@ -861,13 +875,19 @@ window.AppFormRenderer = {
 
         try {
             const baseUrl = window.AppAPI?.BASE_URL || '';
-            let url = `${baseUrl}/api/templates/${templateId}/widgets/${widgetFile}`;
-            let textResponse = await fetch(url);
-
-            // Fallback: if template-local widget not found, try shared widget
-            if (!textResponse.ok) {
-                const sharedUrl = `${baseUrl}/api/widgets/shared/${widgetFile}`;
-                textResponse = await fetch(sharedUrl);
+            let url;
+            let textResponse;
+            // Only probe template-local widget if has_widgets is true
+            if (this.currentSchema?.has_widgets) {
+                url = `${baseUrl}/api/templates/${templateId}/widgets/${widgetFile}`;
+                textResponse = await fetch(url);
+                if (!textResponse.ok) {
+                    const sharedUrl = `${baseUrl}/api/widgets/shared/${widgetFile}`;
+                    textResponse = await fetch(sharedUrl);
+                }
+            } else {
+                url = `${baseUrl}/api/widgets/shared/${widgetFile}`;
+                textResponse = await fetch(url);
             }
 
             if (!textResponse.ok) throw new Error(`Failed to load widget: ${textResponse.status}`);
@@ -899,6 +919,11 @@ window.AppFormRenderer = {
                 self.emitDataChanged(field.key);
                 self.updateAllSummaryConfigs();
                 self.handleDependentFieldUpdate(field.key, data);
+                // Issue 1 fix: explicitly trigger risk computation
+                // so presets (risk_assessment, risk_suggestion, remediation_measures)
+                // update even when DOM event chain from setFormValue may be broken
+                // during async widget initialization.
+                self.autoCalculateRiskLevel();
             },
             getFormValue: (key) => self.formData[key],
             setFormValue: (key, value) => self.setFieldValue(key, value),
@@ -915,7 +940,12 @@ window.AppFormRenderer = {
                 return (window.AppConfig && window.AppConfig.THEME && window.AppConfig.THEME[key]) || {};
             },
             toast: (msg) => window.AppUtils?.showToast?.(msg),
-            openImagePreview: (src, title) => self.openImagePreview(src, title)
+            openImagePreview: (src, title) => self.openImagePreview(src, title),
+            // Issue 1: trigger risk computation after widget count updates.
+            // Widgets call this after updateVulnCounts() ensures count_* fields
+            // are fresh before the behavior chain evaluates overall_risk_level
+            // and applies presets (risk_assessment, risk_suggestion, remediation_measures).
+            triggerRiskCompute: () => self.autoCalculateRiskLevel()
         };
     },
 
@@ -1997,11 +2027,18 @@ window.AppFormRenderer = {
         // Count vulns (aggregate internet + intranet vuln arrays)
         if (pc.count_vulns) {
             const cv = pc.count_vulns;
+            // Issue 2 fix: skip if any sources haven't been initialized yet
+            // (widgets load asynchronously; formData[srcKey] is undefined until
+            // the widget's setData callback fires on init)
+            const sources = cv.source || [];
+            if (sources.some(function(s) { return this.formData[s] === undefined; }, this)) {
+                return; // defer until all widget sources have initialized
+            }
             const allVulns = [];
-            (cv.source || []).forEach(srcKey => {
+            sources.forEach(function(srcKey) {
                 const arr = this.formData[srcKey] || [];
                 allVulns.push(...arr);
-            });
+            }, this);
 
             let criticalHigh = 0;
             const systems = new Set();
@@ -2015,12 +2052,19 @@ window.AppFormRenderer = {
                     criticalHigh += count;
                 }
 
-                const sys = (vuln[cv.system_field] || '').trim();
-                if (sys) systems.add(sys);
+                // Issue 2: system counting is now opt-in via system_field config.
+                // Templates that want auto system counting can set system_field in
+                // their pre_compute.count_vulns; those that want manual counts omit it.
+                if (cv.system_field) {
+                    const sys = (vuln[cv.system_field] || '').trim();
+                    if (sys) systems.add(sys);
+                }
             });
 
             result.count_high_critical_vulns = criticalHigh;
-            result.unique_systems = systems.size;
+            if (cv.system_field) {
+                result.unique_systems = systems.size;
+            }
         }
 
         // Count servers
@@ -2347,6 +2391,10 @@ window.AppFormRenderer = {
                 el.value = value;
             }
             el.dispatchEvent(new Event('change', {bubbles:true}));
+        } else {
+            // No DOM element (e.g. readonly computed fields set by widget):
+            // manually trigger behavior scanning
+            this.handleChange(key, value);
         }
     },
 
