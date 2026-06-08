@@ -1036,7 +1036,7 @@ class TemplateManager:
         
         # 内置模板不可删除
         source_dir = self._template_source_dirs.get(template_id)
-        if source_dir is None or os.path.abspath(source_dir) == os.path.abspath(self.templates_dir):
+        if source_dir is None or os.path.dirname(os.path.abspath(source_dir)) == os.path.abspath(self.templates_dir):
             return False, "内置模板不可删除"
         
         # 防止删除默认模板
@@ -1080,7 +1080,7 @@ class TemplateManager:
         user_dir = os.path.abspath(self.user_templates_dir)
         return [
             tid for tid, src in self._template_source_dirs.items()
-            if os.path.abspath(src) == user_dir
+            if os.path.dirname(os.path.abspath(src)) == user_dir
         ]
     
     @property
