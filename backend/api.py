@@ -139,6 +139,94 @@ def _ensure_dir(path: str) -> None:
     """确保目录存在（幂等）。"""
     os.makedirs(path, exist_ok=True)
 
+def _upgrade_appdata_configs() -> None:
+    """Sync version and new config fields from install dir to AppData on non-first launches."""
+    if not _USERDATA_ENABLED or not USER_DATA_DIR:
+        return
+    
+    try:
+        # ---- shared-config.json ----
+        src_shared = os.path.join(BASE_DIR, 'shared-config.json')
+        dst_shared = os.path.join(USER_DATA_DIR, 'shared-config.json')
+        
+        if os.path.exists(src_shared):
+            with open(src_shared, 'r', encoding='utf-8') as f:
+                src = json.load(f)
+            if not isinstance(src, dict):
+                src = {}
+            
+            dst = {}
+            if os.path.exists(dst_shared):
+                try:
+                    with open(dst_shared, 'r', encoding='utf-8') as f:
+                        dst = json.load(f)
+                except Exception:
+                    dst = {}
+            
+            if not isinstance(dst, dict):
+                dst = {}
+            
+            updated = False
+            
+            # Sync app.version
+            if 'app' in src:
+                dst.setdefault('app', {})
+                if dst['app'].get('version') != src['app'].get('version'):
+                    dst['app']['version'] = src['app']['version']
+                    updated = True
+            
+            # Copy new top-level keys
+            for key in src:
+                if key not in dst:
+                    dst[key] = src[key]
+                    updated = True
+            
+            if updated:
+                tmp = dst_shared + '.tmp'
+                os.makedirs(os.path.dirname(tmp), exist_ok=True)
+                with open(tmp, 'w', encoding='utf-8') as f:
+                    json.dump(dst, f, ensure_ascii=False, indent=2)
+                    f.write('\n')
+                os.replace(tmp, dst_shared)
+                logger.info("Upgraded shared-config.json in AppData")
+        
+        # ---- config.yaml ----
+        src_config = os.path.join(BASE_DIR, 'config.yaml')
+        dst_config = os.path.join(USER_DATA_DIR, 'config.yaml')
+        
+        if os.path.exists(src_config):
+            with open(src_config, 'r', encoding='utf-8') as f:
+                src_yaml = yaml.safe_load(f) or {}
+            
+            dst_yaml = {}
+            if os.path.exists(dst_config):
+                try:
+                    with open(dst_config, 'r', encoding='utf-8') as f:
+                        dst_yaml = yaml.safe_load(f) or {}
+                except Exception:
+                    dst_yaml = {}
+            
+            updated_yaml = False
+            
+            if 'version' in src_yaml and dst_yaml.get('version') != src_yaml['version']:
+                dst_yaml['version'] = src_yaml['version']
+                updated_yaml = True
+            
+            for key in src_yaml:
+                if key not in dst_yaml:
+                    dst_yaml[key] = src_yaml[key]
+                    updated_yaml = True
+            
+            if updated_yaml:
+                tmp_yaml = dst_config + '.tmp'
+                with open(tmp_yaml, 'w', encoding='utf-8') as f:
+                    yaml.safe_dump(dst_yaml, f, allow_unicode=True, default_flow_style=False)
+                os.replace(tmp_yaml, dst_config)
+                logger.info("Upgraded config.yaml in AppData")
+    
+    except Exception as e:
+        logger.warning(f"AppData config upgrade skipped: {e}")
+
 def _init_userdata_dir() -> bool:
     """
     初始化 AppData 目录结构并执行首次启动迁移。
@@ -176,6 +264,9 @@ def _init_userdata_dir() -> bool:
                 elif not os.path.exists(src_path):
                     logger.warning(f"  Seed file not found, skipped: {src_path}")
             logger.info("First-launch migration complete.")
+        
+        # Sync version and new config fields on every startup
+        _upgrade_appdata_configs()
         
         return True
     except Exception as e:
