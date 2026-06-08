@@ -58,6 +58,7 @@ window.AppToolbox = {
                 }
                 if (targetId === 'view-settings') {
                     this.initRuntimeSettingsView();
+                    this._setupWebUIToggle();
                 }
             });
         });
@@ -400,6 +401,39 @@ window.AppToolbox = {
         }
         panel.style.display = 'block';
         this.loadRuntimeConfig();
+    },
+
+
+    _webUIToggleBound: false,
+
+    _setupWebUIToggle() {
+        const toggle = document.getElementById('setting-web-ui-toggle');
+        if (!toggle) return;
+
+        window.AppAPI.WebUIConfig.get().then(result => {
+            toggle.checked = result && result.enabled === true;
+        }).catch(e => {
+            console.error('Failed to load web UI config:', e);
+        });
+
+        if (this._webUIToggleBound) return;
+        this._webUIToggleBound = true;
+
+        toggle.addEventListener('change', async (e) => {
+            const enabled = e.target.checked;
+            try {
+                const result = await window.AppAPI.WebUIConfig.set(enabled);
+                if (result && result.success !== false) {
+                    AppUtils.showToast(enabled ? 'Web 界面已启用' : 'Web 界面已禁用', 'success');
+                } else {
+                    e.target.checked = !enabled;
+                    AppUtils.showToast('保存失败', 'error');
+                }
+            } catch (err) {
+                e.target.checked = !enabled;
+                AppUtils.showToast(`保存失败: ${err.message}`, 'error');
+            }
+        });
     },
 
     parseCsvList(text) {

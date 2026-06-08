@@ -16,6 +16,8 @@ nul
 *.tmp
 *.old
 *~
+backend/templates/_deleted/
+backend/data/template_order.json
 # 忽略系统文件
 .DS_Store
 Thumbs.db

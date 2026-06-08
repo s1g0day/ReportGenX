@@ -6,6 +6,7 @@
 """
 
 import os
+import json
 import yaml
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
@@ -102,6 +103,8 @@ class TemplateManager:
         if self.user_templates_dir and os.path.isdir(self.user_templates_dir):
             logger.info(f"Scanning user templates directory: {self.user_templates_dir}")
             self._scan_templates_dir(self.user_templates_dir, is_user=True)
+
+        self._load_order_overrides()
     
     def _scan_templates_dir(self, templates_base: str, is_user: bool = False):
         """扫描指定目录下的模板"""
@@ -334,6 +337,75 @@ class TemplateManager:
             })
         return result
     
+    def set_default_template(self, template_id: str) -> Dict[str, Any]:
+        """
+        将指定模板设置为默认模板（order=0），其他模板 order 递增 1。
+        
+        Args:
+            template_id: 模板ID
+            
+        Returns:
+            dict with success, message, and template_id
+            
+        Raises:
+            TemplateNotFoundError: 当模板不存在时
+        """
+        template = self.get_template(template_id, raise_if_not_found=True)
+        
+        if template.order == 0:
+            return {
+                "success": True,
+                "message": f"Template '{template_id}' is already the default",
+                "template_id": template_id
+            }
+        
+        # 将所有模板 order 递增 1，再将目标模板设为 0
+        for t in self._templates.values():
+            t.order += 1
+        
+        template.order = 0
+        
+        logger.info(f"Set default template: {template_id}")
+        self._persist_order()
+        return {
+            "success": True,
+            "message": f"Template '{template_id}' set as default",
+            "template_id": template_id
+        }
+
+    def _load_order_overrides(self):
+        """Load persisted order values from template_order.json."""
+        try:
+            order_file = os.path.join(os.path.dirname(self.templates_dir), "data", "template_order.json")
+            if not os.path.exists(order_file):
+                return
+            with open(order_file, 'r', encoding='utf-8') as f:
+                saved = json.load(f)
+            if not isinstance(saved, dict):
+                return
+            for tid, order in saved.items():
+                if tid in self._templates:
+                    try:
+                        self._templates[tid].order = int(order)
+                    except (ValueError, TypeError):
+                        continue
+        except Exception:
+            pass  # safe fallback
+
+    def _persist_order(self):
+        """Persist current template order to template_order.json atomically."""
+        try:
+            order_file = os.path.join(os.path.dirname(self.templates_dir), "data", "template_order.json")
+            os.makedirs(os.path.dirname(order_file), exist_ok=True)
+            order_map = {tid: getattr(t, 'order', 999) for tid, t in self._templates.items()}
+            tmp_path = order_file + ".tmp"
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(order_map, f, ensure_ascii=False, indent=2)
+                f.write("\n")
+            os.replace(tmp_path, order_file)
+        except Exception as exc:
+            logger.warning(f"Failed to persist template order: {exc}")
+
     def get_template_versions(self, template_id: str) -> List[str]:
         """获取模板的所有版本"""
         return self._template_versions.get(template_id, [])

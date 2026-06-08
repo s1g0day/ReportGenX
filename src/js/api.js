@@ -336,6 +336,10 @@ window.AppAPI = {
         
         async delete(id) {
              return window.AppAPI._request(`/api/templates/${id}`, 'DELETE');
+        },
+        
+        async setDefault(id) {
+            return window.AppAPI._request(`/api/templates/${id}/set-default`, 'PUT');
         }
     },
 
@@ -422,5 +426,12 @@ window.AppAPI = {
             a.click();
             URL.revokeObjectURL(url);
         }
+    },
+
+    // --- Web UI ---
+
+    WebUIConfig: {
+        get: () => window.AppAPI._request('/api/web-ui-config'),
+        set: (enabled) => window.AppAPI._request('/api/web-ui-config', 'POST', { enabled })
     }
 };

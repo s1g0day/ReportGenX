@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Requ
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -43,6 +44,7 @@ from backend.core.handler_registry import HandlerRegistry
 from backend.core.logger import setup_logger
 from backend.core.report_merger import ReportMerger
 from backend.core.template_manager import TemplateManager
+from backend.core.exceptions import TemplateNotFoundError
 
 _LEGACY_CORE_ALIAS_MODULES = (
     "base_handler",
@@ -334,8 +336,58 @@ def persist_shared_config(next_config: dict[str, Any]) -> dict[str, Any]:
         f.write("\n")
     return normalized
 
+
+def get_web_ui_config() -> dict[str, bool]:
+    """Read web_ui config from shared-config.json with safe defaults."""
+    global _web_ui_enabled
+    try:
+        if os.path.exists(SHARED_CONF_PATH):
+            with open(SHARED_CONF_PATH, 'r', encoding='utf-8') as f:
+                raw = json.load(f)
+            web_ui = raw.get("web_ui", {}) if isinstance(raw, dict) else {}
+            enabled = web_ui.get("enabled", False) if isinstance(web_ui, dict) else False
+            _web_ui_enabled = bool(enabled)
+        else:
+            _web_ui_enabled = False
+    except Exception as exc:
+        logger.warning(f"Failed to read web_ui config, defaulting to disabled: {exc}")
+        _web_ui_enabled = False
+    return {"enabled": _web_ui_enabled}
+
+
+def set_web_ui_config(enabled: bool) -> dict[str, bool]:
+    """Update web_ui.enabled in shared-config.json atomically."""
+    global _web_ui_enabled
+    try:
+        enabled_bool = bool(enabled)
+        _web_ui_enabled = enabled_bool
+
+        if os.path.exists(SHARED_CONF_PATH):
+            with open(SHARED_CONF_PATH, 'r', encoding='utf-8') as f:
+                current = json.load(f)
+        else:
+            current = {}
+
+        if not isinstance(current, dict):
+            current = {}
+
+        current["web_ui"] = {"enabled": enabled_bool}
+
+        tmp_path = SHARED_CONF_PATH + ".tmp"
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            json.dump(current, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        os.replace(tmp_path, SHARED_CONF_PATH)
+
+        return {"enabled": enabled_bool}
+    except Exception as exc:
+        logger.error(f"Failed to persist web_ui config: {exc}")
+        raise
+
+
 config = load_config()
 shared_config = load_shared_config()
+_web_ui_enabled = False
 APP_API_TOKEN = str(os.getenv("APP_API_TOKEN", "") or "")
 _ensure_legacy_core_import_aliases(
     use_alias_fallback=bool(
@@ -683,6 +735,10 @@ class PluginRuntimeConfigRequest(BaseModel):
     isolated_fallback_mode: Optional[str] = None
     metrics_emit_every_n: Optional[int] = None
 
+
+class WebUIConfigRequest(BaseModel):
+    enabled: bool
+
 class OpenFolderRequest(BaseModel):
     """打开文件夹请求"""
     path: Optional[str] = None
@@ -703,6 +759,7 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     get_template_manager()
+    get_web_ui_config()
     logger.info("Template system initialized")
     yield
     # Shutdown (如有需要可在此添加清理逻辑)
@@ -738,6 +795,15 @@ async def general_exception_handler(request: Request, exc: Exception):
     """处理未捕获的异常"""
     logger.error(f"Unhandled exception: {traceback.format_exc()}")
     return _error_response(500, "Internal Server Error", str(exc) if os.getenv("DEBUG") else None)
+
+
+class WebUIBlockMiddleware(BaseHTTPMiddleware):
+    """Block /ui requests when web_ui.enabled is False."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path.startswith("/ui") and not _web_ui_enabled:
+            return JSONResponse({"detail": "Web UI is disabled"}, status_code=404)
+        return await call_next(request)
 
 
 @app.middleware("http")
@@ -777,6 +843,8 @@ app.mount("/temp", StaticFiles(directory=TEMP_DIR), name="temp")
 SRC_DIR = os.path.join(BASE_DIR, "..", "src")
 if os.path.exists(SRC_DIR):
     app.mount("/ui", StaticFiles(directory=SRC_DIR, html=True), name="frontend")
+
+app.add_middleware(WebUIBlockMiddleware)
 
 
 def _is_subpath(path_to_check: str, base_path: str) -> bool:
@@ -938,6 +1006,22 @@ def update_plugin_runtime_config(req: PluginRuntimeConfigRequest):
         }
     except Exception as exc:
         _raise_internal_error("update plugin runtime config", exc)
+
+
+@config_router.get("/api/web-ui-config")
+def get_web_ui_config_endpoint():
+    """返回 web_ui 配置（enabled 状态）。"""
+    return get_web_ui_config()
+
+
+@config_router.post("/api/web-ui-config")
+def update_web_ui_config_endpoint(req: WebUIConfigRequest):
+    """更新 web_ui.enabled 配置。"""
+    try:
+        result = set_web_ui_config(req.enabled)
+        return {"success": True, "enabled": result["enabled"]}
+    except Exception as exc:
+        _raise_internal_error("update web ui config", exc)
 
 
 @config_router.get("/api/backup-db")
@@ -1899,6 +1983,18 @@ def get_template_details(template_id: str):
     return details
 
 
+@app.put("/api/templates/{template_id}/set-default")
+def set_default_template(template_id: str):
+    """将指定模板设置为默认模板"""
+    try:
+        result = get_template_manager().set_default_template(template_id)
+        return result
+    except TemplateNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Template not found: {template_id}")
+    except Exception as e:
+        _raise_internal_error("set default template", e)
+
+
 @app.get("/api/templates/{template_id}/check-deps")
 def check_template_dependencies(template_id: str):
     """
@@ -1982,8 +2078,8 @@ def batch_export_templates(template_ids: list[str]):
                     if file.endswith('.pyc'):
                         continue
                     file_path = os.path.join(root, file)
-                    arcname = os.path.relpath(file_path, TEMPLATES_DIR)
-                    zf.write(file_path, arcname)
+                    arcname = os.path.relpath(file_path, template_dir)
+                    zf.write(file_path, f"{template_id}/{arcname}".replace("\\", "/"))
     
     zip_buffer.seek(0)
     
@@ -2006,7 +2102,7 @@ def _detect_templates_in_zip(names: list[str]) -> list[str]:
     template_ids = set()
     
     for name in names:
-        parts = name.split('/')
+        parts = name.replace('\\', '/').split('/')
         if len(parts) >= 2 and parts[1] == 'schema.yaml':
             # 找到 template_id/schema.yaml
             template_ids.add(parts[0])
@@ -2058,7 +2154,8 @@ def _import_single_template(zf, template_id: str, all_names: list[str], overwrit
     try:
         for file_name in template_files:
             # 1. 检查文件名是否包含路径遍历字符
-            if '..' in file_name or file_name.startswith('/') or '\\' in file_name:
+            normalized = file_name.replace('\\', '/')
+            if '..' in normalized or normalized.startswith('/'):
                 raise ValueError(f"Malicious path detected: {file_name}")
 
             # 2. 规范化目标路径
@@ -2123,6 +2220,7 @@ async def import_template(file: UploadFile = File(...), overwrite: bool = Form(d
                 raise HTTPException(status_code=400, detail="No valid templates found in ZIP")
             
             imported = []
+            replaced = []
             skipped = []
             errors = []
             import_contexts: list[dict[str, Any]] = []
@@ -2133,6 +2231,8 @@ async def import_template(file: UploadFile = File(...), overwrite: bool = Form(d
                     if result['success']:
                         imported.append(template_id)
                         import_contexts.append(result)
+                        if result.get('backup_dir'):
+                            replaced.append(template_id)
                     else:
                         skipped.append({'id': template_id, 'reason': result['reason']})
                 except Exception as e:
@@ -2169,6 +2269,7 @@ async def import_template(file: UploadFile = File(...), overwrite: bool = Form(d
             return {
                 "success": len(imported) > 0,
                 "imported": imported,
+                "replaced": replaced,
                 "skipped": skipped,
                 "errors": errors,
                 "message": f"Successfully imported {len(imported)} template(s)"

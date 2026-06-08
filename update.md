@@ -1,5 +1,14 @@
 # Update Log
 
+## v0.21.3 (2026-06-08)
+
+- **模板管理**：模板详情弹窗增加「设为默认」按钮（JSON 文件持久化 order，重启不丢失）；导入同名模板静默替换并通知被替换列表
+- **系统设置**：增加 Web UI 开关（控制 `/ui` 路由，默认关闭，即时生效，middleware 拦截）
+- **Bug 修复**：修复 Windows 批量导入导出路径分隔符不兼容（3 处 `\` → `/` 规范化）；修复默认模板重启失效（引入 `template_order.json` 原子读写）；修复导入 overwrite=false 导致替换永远不触发
+- **其他**：`backend/templates/_deleted/` 加入 gitignore
+
+---
+
 ## v0.21.2 (2026-06-04)
 
 - **文档同步**：修复 README.md / AGENTS.md 文件列表，更新架构分析和项目概览文档

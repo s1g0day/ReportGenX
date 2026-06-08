@@ -443,8 +443,14 @@ window.AppTemplateManager = {
         html += this.renderFieldsList(schema);
         
         // 操作按钮区域
+        const isDefault = this.getDefaultTemplateId() === template.id;
         html += '<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; display: flex; gap: 10px; justify-content: flex-end;">';
         html += `<button class="btn btn-secondary" onclick="document.getElementById('template-detail-modal').style.display='none'">关闭</button>`;
+        if (isDefault) {
+            html += `<button class="btn btn-default" disabled style="opacity: 0.6; cursor: not-allowed;">已是默认</button>`;
+        } else {
+            html += `<button class="btn btn-warning" id="set-default-btn" onclick="window.AppTemplateManager.setAsDefault('${template.id}')">⭐ 设为默认</button>`;
+        }
         html += `<button class="btn btn-primary" onclick="window.AppTemplateManager.exportTemplate('${template.id}')">📤 导出</button>`;
         html += '</div>';
         
@@ -514,6 +520,43 @@ window.AppTemplateManager = {
         return defaultTemplate ? defaultTemplate.id : null;
     },
     
+    async setAsDefault(templateId) {
+        const btn = document.getElementById('set-default-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = '设置中...';
+        }
+        
+        try {
+            await window.AppAPI.Templates.setDefault(templateId);
+            
+            // Close modal
+            const modal = document.getElementById('template-detail-modal');
+            if (modal) modal.style.display = 'none';
+            
+            // Refresh template list
+            await this.loadTemplateListForManagement();
+            
+            // Sync main UI template selector
+            if (window.AppFormRenderer && window.AppFormRenderer.reloadTemplates) {
+                await window.AppFormRenderer.reloadTemplates();
+            }
+            
+            if (window.AppUtils && window.AppUtils.showToast) {
+                window.AppUtils.showToast('已设为默认模板', 'success');
+            }
+        } catch (e) {
+            console.error('Set default template failed:', e);
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '⭐ 设为默认';
+            }
+            if (window.AppUtils && window.AppUtils.showToast) {
+                window.AppUtils.showToast(`设置失败: ${e.message || '未知错误'}`, 'error');
+            }
+        }
+    },
+    
     toggleTemplateSelection(templateId, checked) {
         if (checked) {
             if (!this.selectedTemplateIds.includes(templateId)) {
@@ -575,12 +618,16 @@ window.AppTemplateManager = {
                 AppUtils.showToast('正在导入模板...', 'info');
             }
             
-            const result = await window.AppAPI.Templates.import(file, false);
+            const result = await window.AppAPI.Templates.import(file, true);
             
             if (result.success) {
                 const count = result.imported ? result.imported.length : 1;
                 if (window.AppUtils) {
-                    AppUtils.showToast(`成功导入 ${count} 个模板`, 'success');
+                    let msg = `成功导入 ${count} 个模板`;
+                    if (result.replaced && result.replaced.length > 0) {
+                        msg += `。以下模板被替换：${result.replaced.join('、')}`;
+                    }
+                    AppUtils.showToast(msg, 'success');
                 }
                 await this.loadTemplateListForManagement();
                 if (window.AppFormRenderer) {
@@ -602,11 +649,15 @@ window.AppTemplateManager = {
                 AppUtils.showToast(`正在导入 ${files.length} 个文件...`, 'info');
             }
             
-            const result = await window.AppAPI.Templates.batchImport(files, false);
+            const result = await window.AppAPI.Templates.batchImport(files, true);
             
             if (result.success) {
                 if (window.AppUtils) {
-                    AppUtils.showToast(`成功导入 ${result.total_imported} 个模板`, 'success');
+                    let msg = `成功导入 ${result.total_imported} 个模板`;
+                    if (result.replaced && result.replaced.length > 0) {
+                        msg += `。以下模板被替换：${result.replaced.join('、')}`;
+                    }
+                    AppUtils.showToast(msg, 'success');
                 }
                 await this.loadTemplateListForManagement();
                 if (window.AppFormRenderer) {
