@@ -1496,9 +1496,6 @@ window.AppFormRenderer = {
         
         container.appendChild(btnContainer);
         
-        // 默认添加一行
-        setTimeout(() => this.addArrayRow(field.key, field), 0);
-        
         return container;
     },
 

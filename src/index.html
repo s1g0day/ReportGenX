@@ -170,10 +170,11 @@
                                                 <option value="信息性">信息性</option>
                                             </select>
                                         </div>
-                                         <div class="form-group manager-flex-2">
-                                            <label>定级依据</label>
-                                            <input type="text" id="manage-basis" placeholder="例如：关键信息泄露">
-                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>定级依据</label>
+                                        <textarea id="manage-basis" rows="3" placeholder="例如：关键信息泄露"></textarea>
                                     </div>
 
                                     <div class="form-group">
@@ -298,6 +299,28 @@
                                 <div class="settings-overview-note">
                                     <span class="settings-note-label">建议</span>
                                     <span>调整运行时参数前先导出一份数据库备份，便于回滚与迁移。</span>
+                                </div>
+                            </section>
+
+                            <section class="settings-card settings-card-basic">
+                                <div class="settings-card-header">
+                                    <div class="settings-card-icon" aria-hidden="true">🏢</div>
+                                    <div>
+                                        <h3 class="settings-card-title">基本设置</h3>
+                                        <p class="settings-card-desc">配置报告默认使用的技术支持单位名称，生成报告时将作为默认值填充。</p>
+                                    </div>
+                                </div>
+                                <div class="settings-field" style="max-width: 400px;">
+                                    <label for="setting-supplier-name">技术支持单位（supplierName）</label>
+                                    <input type="text" id="setting-supplier-name" placeholder="请输入默认技术支持单位名称">
+                                    <label for="setting-city" style="margin-top: 12px;">城市</label>
+                                    <input type="text" id="setting-city" placeholder="例如：北京">
+                                    <label for="setting-region" style="margin-top: 12px;">区域</label>
+                                    <input type="text" id="setting-region" placeholder="例如：海淀区">
+                                    <small class="settings-field-help">修改后需点击下方"保存配置"按钮生效，新生成的报告将使用更新后的名称。</small>
+                                </div>
+                                <div class="settings-actions">
+                                    <button type="button" id="btn-basic-save" class="btn btn-primary">保存配置</button>
                                 </div>
                             </section>
 
@@ -447,6 +470,10 @@
                                     </label>
                                 </div>
                                 <p style="color: #909399; font-size: 12px; margin: 0 0 0 24px;">开启后可通过浏览器访问应用界面</p>
+                                <div class="settings-tip-row" style="margin-top: 8px;">
+                                    <span class="settings-tip-badge">注意</span>
+                                    <span>此功能仅适用于源码开发模式（npm run start），打包后的生产环境不提供 Web 服务。</span>
+                                </div>
                             </section>
                         </div>
                     </div>

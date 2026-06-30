@@ -744,6 +744,8 @@ class ConfigResponse(BaseModel):
     """返回给前端的初始化配置信息"""
     version: str
     supplierName: str
+    city: str
+    region: str
     hazard_types: list[str]
     unit_types: list[str]
     industries: list[str]
@@ -810,7 +812,9 @@ class BatchDeleteRequest(BaseModel):
     ids: list[str]
 
 class UpdateConfigRequest(BaseModel):
-    supplierName: str
+    supplierName: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None
 
 
 class PluginRuntimeConfigRequest(BaseModel):
@@ -1003,6 +1007,8 @@ def get_config():
     return {
         "version": config["version"],
         "supplierName": config["supplierName"],
+        "city": config.get("city", ""),
+        "region": config.get("region", ""),
         "hazard_types": clean_list(config.get("hazard_type", [])),
         "unit_types": clean_list(config.get("unitType", [])),
         "industries": clean_list(config.get("industry", [])),
@@ -1814,22 +1820,27 @@ def download_icp_template():
 
 @config_router.post("/api/update-config")
 def update_config(req: UpdateConfigRequest):
-    """更新配置文件中的 supplierName"""
+    """更新配置文件（supplierName / city / region）"""
     try:
         # Load current YAML
         with open(CONF_PATH, 'r', encoding='utf-8') as f:
             current_conf = yaml.safe_load(f)
         
-        # Update value
-        current_conf['supplierName'] = req.supplierName
+        # Conditionally update only provided fields (is not None guard)
+        if req.supplierName is not None:
+            current_conf['supplierName'] = req.supplierName
+            config['supplierName'] = req.supplierName
+        if req.city is not None:
+            current_conf['city'] = req.city
+            config['city'] = req.city
+        if req.region is not None:
+            current_conf['region'] = req.region
+            config['region'] = req.region
         
         # Write back to YAML
         with open(CONF_PATH, 'w', encoding='utf-8') as f:
             yaml.safe_dump(current_conf, f, allow_unicode=True, sort_keys=False)
             
-        # Update memory config
-        config['supplierName'] = req.supplierName
-        
         # 更新模板管理器的配置
         get_template_manager().update_config(config)
         

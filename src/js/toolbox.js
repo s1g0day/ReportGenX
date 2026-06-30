@@ -59,6 +59,7 @@ window.AppToolbox = {
                 if (targetId === 'view-settings') {
                     this.initRuntimeSettingsView();
                     this._setupWebUIToggle();
+                    this.initBasicSettingsView();
                 }
             });
         });
@@ -97,6 +98,9 @@ window.AppToolbox = {
 
         const btnRuntimeSave = document.getElementById('btn-runtime-save');
         if (btnRuntimeSave) btnRuntimeSave.addEventListener('click', () => this.saveRuntimeConfig());
+
+        const btnBasicSave = document.getElementById('btn-basic-save');
+        if (btnBasicSave) btnBasicSave.addEventListener('click', () => this.saveBasicConfig());
 
         document.querySelectorAll('.runtime-rollout-preset').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -519,6 +523,42 @@ window.AppToolbox = {
             }
             AppUtils.showToast('保存失败', 'error');
         } catch (e) {
+            AppUtils.showToast(`保存失败: ${e.message}`, 'error');
+        }
+    },
+
+    initBasicSettingsView() {
+        this.loadBasicConfig();
+    },
+
+    async loadBasicConfig() {
+        try {
+            const result = await window.AppAPI.getConfig();
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.value = val || '';
+            };
+            setVal('setting-supplier-name', result?.supplierName);
+            setVal('setting-city', result?.city);
+            setVal('setting-region', result?.region);
+        } catch(e) {
+            AppUtils.showToast('加载基本配置失败', 'error');
+        }
+    },
+
+    async saveBasicConfig() {
+        try {
+            const getVal = (id) => document.getElementById(id)?.value?.trim() || '';
+            const supplierName = getVal('setting-supplier-name');
+            const city = getVal('setting-city');
+            const region = getVal('setting-region');
+            const result = await window.AppAPI.updateConfig({ supplierName, city, region });
+            if (result && result.success) {
+                AppUtils.showToast('基本配置已保存', 'success');
+            } else {
+                AppUtils.showToast('保存失败', 'error');
+            }
+        } catch(e) {
             AppUtils.showToast(`保存失败: ${e.message}`, 'error');
         }
     },
